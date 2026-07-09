@@ -4,11 +4,18 @@
 %  Standalone paper draft - Lucas Posern
 %
 %  All quoted numbers are reproduced by code/paper_numbers.py from
-%  the frozen data in ../data/ (thesis pipeline: excess returns,
-%  sample cov ddof=1, sklearn Ledoit-Wolf, implied delta).
+%  the frozen data in ../data/ (excess returns, sample cov ddof=1,
+%  sklearn LW intensity applied to the ddof-1 matrix, implied delta,
+%  weights via (delta Sigma)^-1 mu).
 %  Revision 2026-07: corrected rho* (factor-2 bug), exact per-pair
 %  Delta c_eff table, updated backtest to thesis view set, paper
 %  frame (abstract, introduction, conclusion), decimal points.
+%  Revision 2026-07 v2 (referee fixes): single-view scoping of the
+%  Idzorek result + Remark 1 (K>1), signed rho* statement + negative
+%  branch, ddof convention pinned, weights = (delta Sigma)^-1 mu
+%  throughout, frozen-Omega backtest column, Memmel test, corrected
+%  mu_s inequality in 6.6, attribution fixes (Walters, He-Litterman),
+%  new refs (Markowitz, Sharpe, Chopra-Ziemba, Memmel, LW 2008).
 % ============================================================
 
 \documentclass[a4paper,11pt]{article}
@@ -63,7 +70,6 @@
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\Sig}{\Sigma}
 \newcommand{\Om}{\Omega}
-\newcommand{\Mprec}{M}
 \newcommand{\muBL}{\mu_{\mathrm{BL}}}
 \newcommand{\Std}{\mathrm{Std}}
 \newcommand{\LW}{\mathrm{LW}}
@@ -89,11 +95,14 @@ on the proof strategy. All remaining errors are mine.}}
 The Black--Litterman model is routinely combined with shrinkage estimators
 of the covariance matrix, most prominently the Ledoit--Wolf estimator.
 We show that the effect of the estimator switch on the posterior depends
-entirely on how the view-uncertainty matrix $\Omega$ is handled. Under
-Idzorek's confidence calibration, $\Omega$ co-moves with $\Sigma$ and the
-switch is exactly inert in the view channel. If instead $\Omega$ is
-calibrated once on the sample covariance and then frozen---a workflow that
-appears regularly in practice---the effective view confidence
+on how the view-uncertainty matrix $\Omega$ is handled. Under
+Idzorek's confidence calibration, $\Omega$ co-moves with $\Sigma$ and, for
+a single view, the switch is exactly inert in the view channel; with
+several views the deviation is driven by the cross-view covariances and
+stays an order of magnitude below the effects studied here. If instead
+$\Omega$ is calibrated once on the sample covariance and then frozen, a
+workflow that can easily arise when the covariance model is upgraded after
+the views have been signed off, the effective view confidence
 $c_{\eff}$ shifts by a closed-form amount that is independent of the prior
 scale $\tau$ and grows with the shrinkage intensity. The shift is positive
 precisely when the view variance lies below twice the average asset
@@ -101,10 +110,10 @@ variance, a condition met by relative views on highly correlated pairs
 \emph{and} on low-variance (bond) pairs. We derive an exact expression for
 the induced changes in posterior means and weights under a single relative
 view, provide a closed-form critical correlation threshold, and quantify
-the effect on the eight-asset Idzorek ETF universe: at a shrinkage
-intensity of $0.041$, five of 28 pairs shift their effective confidence by
-more than five percentage points, the largest by $+10.6$. Recomputing
-$\Omega$ alongside $\Sigma$ removes the leakage exactly.
+the effect on an ETF implementation of Idzorek's eight-asset universe: at
+a shrinkage intensity of $0.041$, five of 28 pairs shift their effective
+confidence by more than five percentage points, the largest by $+10.7$.
+Recomputing $\Omega$ alongside $\Sigma$ removes the leakage exactly.
 \end{abstract}
 
 \medskip
@@ -119,17 +128,19 @@ view uncertainty; covariance estimation; portfolio construction.\\
 
 The Black--Litterman model \citep{BlackLitterman1992} is one of the few
 pieces of portfolio theory that made the crossing from journals to
-practice. It anchors expected returns at the market equilibrium and blends
-in subjective views with an explicit uncertainty matrix $\Omega$, thereby
-taming the input sensitivity of mean--variance optimisation documented by
-\citet{Michaud1989} and \citet{BestGrauer1991}. Its second input, the
-covariance matrix $\Sigma$, receives far less attention in the
-Black--Litterman literature, although the sample estimator is unreliable
-whenever the number of assets is not small relative to the sample size.
-The standard remedy is the shrinkage estimator of \citet{LedoitWolf2004},
-which pulls the sample covariance toward a scaled identity and improves
-the conditioning of $\Sigma^{-1}$ by orders of magnitude in equity
-universes \citep{LedoitWolfHoney2004}.
+practice. It anchors expected returns at the CAPM market equilibrium
+\citep{Sharpe1964} and blends in subjective views with an explicit
+uncertainty matrix $\Omega$, thereby taming the input sensitivity of
+mean--variance optimisation \citep{Markowitz1952} documented by
+\citet{Michaud1989}, \citet{BestGrauer1991} and \citet{ChopraZiemba1993}.
+Its second input, the covariance matrix $\Sigma$, receives comparatively
+little attention in the Black--Litterman literature, although the sample
+estimator is unreliable whenever the number of assets is not small
+relative to the sample size. The standard remedy is the shrinkage
+estimator of \citet{LedoitWolf2004}, which pulls the sample covariance
+toward a scaled identity and improves the conditioning of $\Sigma^{-1}$
+substantially---on our data the condition number falls by a factor of
+three, and by far more as $n$ approaches $T$ \citep{LedoitWolfHoney2004}.
 
 This paper studies what happens inside the Black--Litterman model when the
 covariance estimator is switched from the sample estimator to Ledoit--Wolf.
@@ -140,32 +151,36 @@ derived from $\Sigma$ through Idzorek's confidence calibration
 \citep{Idzorek2007} and therefore co-moves with the estimator. In the
 second, $\omega_k$ is computed once on the sample covariance, stored as a
 set of scalars, and left untouched when the covariance model is later
-upgraded---for instance because the badly conditioned
-$\hat\Sigma_s^{-1}$ produced visibly implausible leverage.
+upgraded. We call the resulting silent shift of the effective inputs
+\emph{leakage}.
 
 Our contribution is threefold. First, we show that under Idzorek's
 calibration the estimator switch is \emph{exactly} inert in the view
-channel: the effective view absorption equals the specified confidence
-$c$ for any positive-definite estimator, and the entire effect on the
-posterior runs through the equilibrium prior, bounded at
-$O(\alpha)$. Second, for the fixed-$\Omega$ workflow we derive a
-closed-form expression for the shift $\Delta c_{\eff}$ of the effective
-view confidence. The expression is exact, independent of $\tau$, linear in
-the shrinkage intensity $\alpha$ for small $\alpha$, and its sign is
-determined by a simple criterion: the view variance versus twice the
+channel for a single view: the effective view absorption equals the
+specified confidence $c$ for any positive-definite estimator, and the
+remaining effect on the posterior runs through the equilibrium prior and
+the view projection, both exactly linear in $\alpha$. With several
+simultaneous views the deviation is driven by the cross-view covariances;
+Remark~\ref{rem:multiview} quantifies it. Second, for the fixed-$\Omega$
+workflow we derive a closed-form expression for the shift
+$\Delta c_{\eff}$ of the effective view confidence. The expression is
+exact, independent of $\tau$ (the same $\tau$ enters calibration and
+posterior, and cancels), linear in the shrinkage intensity $\alpha$ for
+small $\alpha$, and its sign is determined by a simple criterion: the view variance versus twice the
 average asset variance. In the symmetric case of equal asset volatilities
 this criterion translates into a closed-form critical correlation
 threshold $\rho^*(\alpha, \varepsilon)$. An exact identity for the
 Black--Litterman posterior under a single relative view then propagates
 $\Delta c_{\eff}$ analytically into posterior means and portfolio
-weights. Third, we quantify the effect on the eight-asset ETF universe of
-\citet{Idzorek2007}: with the analytic shrinkage intensity
-$\alpha = 0.041$, five of the 28 asset pairs shift their effective
-confidence by more than five percentage points---among them a bond pair
-with moderate correlation, which shows that the popular intuition
-``only high correlations are affected'' is incomplete. An out-of-sample
-backtest separates this view channel from the precision channel through
-$\Sigma^{-1}$.
+weights. Third, we quantify the effect on an ETF implementation of the
+eight asset classes in \citet{Idzorek2007}: with the analytic shrinkage
+intensity $\alpha = 0.041$, five of the 28 asset pairs shift their
+effective confidence by more than five percentage points---among them a
+bond pair with moderate correlation, which shows that the intuition a
+reader might bring, that only high correlations are affected, is
+incomplete. An out-of-sample backtest separates the view channel from the
+precision channel through $\Sigma^{-1}$ and prices the frozen-$\Omega$
+workflow directly.
 
 The practical lesson is procedural rather than statistical. Covariance
 estimator, confidence and view uncertainty form one unit; upgrading one
@@ -202,34 +217,45 @@ $\Sigma\succ 0$, the Black--Litterman posterior mean is
 \begin{equation}
 \label{eq:bl-posterior}
   \muBL \;=\; \bigl[(\tau\Sig)^{-1} + P^\top\Om^{-1}P\bigr]^{-1}
-              \bigl[(\tau\Sig)^{-1}\Pi \;+\; P^\top\Om^{-1}Q\bigr],
+              \bigl[(\tau\Sig)^{-1}\pi \;+\; P^\top\Om^{-1}Q\bigr],
 \end{equation}
-with implicit equilibrium return $\Pi = \delta\Sigma w_{\mathrm{eq}}$,
+with implied equilibrium return $\pi = \delta\Sigma w_{\mathrm{eq}}$,
 view-pick matrix $P\in\R^{K\times n}$, view returns $Q\in\R^K$,
 view-uncertainty matrix $\Om\succ 0$, prior scale $\tau>0$, and risk
 aversion $\delta>0$. The unconstrained portfolio is
-$w_{\mathrm{BL}} = \tfrac{1}{\delta}\Sigma^{-1}\muBL$.
+$w_{\mathrm{BL}} = \tfrac{1}{\delta}\Sigma^{-1}\muBL$.%
+\footnote{Some implementations map the posterior to weights with
+$\Sigma_{\mathrm{post}} = \Sigma + M$, where $M$ is the posterior
+covariance of the mean \citep{HeLitterman1999}. All results and all
+reported numbers in this paper use $\Sigma$ itself; for relative views
+this keeps the weights exactly fully invested.}
 
 \paragraph{Data.}
-We use the eight-asset ETF universe of \citet{Idzorek2007}: AGG (US
-bonds), BWX (international bonds), IWF/IWD (US large-cap growth/value),
-IWO/IWN (US small-cap growth/value), EFA (international developed
-equity) and EEM (emerging markets equity). Monthly total returns are
+We use an ETF implementation of the eight asset classes in
+\citet{Idzorek2007}: AGG (US bonds), BWX (international bonds), IWF/IWD
+(US large-cap growth/value), IWO/IWN (US small-cap growth/value), EFA
+(international developed equity) and EEM (emerging markets equity). Monthly total returns are
 taken from Yahoo Finance (adjusted closes) and converted to excess
 returns with the 13-week T-bill rate; the series are complete over the
 whole analysis period. The training window is January 2008 to December
 2018 ($T=132$, $n=8$); January 2019 to December 2024 is reserved for the
 out-of-sample test in Section~\ref{sec:backtest}. The market weights
 $w_{\mathrm{eq}}$ are the market-capitalisation weights published by
-Idzorek for this universe and enter only as the prior anchor. All data,
+Idzorek for these asset classes; they predate the sample (2004 vintage),
+which makes them a dated but look-ahead-free prior anchor. All data,
 the estimation pipeline and every number quoted in this paper are
 reproduced by a single script; see the reproducibility statement at the
 end.
 
 \paragraph{Calibrated quantities.}
 On the training window the implied risk aversion of the S\&P~500 excess
-return series is $\delta = 2.44$; we use $\tau = 0.05$ and view
-confidences $c_k = 0.50$ throughout. The average asset variance, which
+return series is $\delta = 2.44$ (the ratio of annualised mean to
+annualised variance). We use $\tau = 0.05$, the upper end of the range in
+\citet{HeLitterman1999} and \citet{Idzorek2007}---the central result of
+Section~\ref{sec:fixed-omega} is independent of this choice---and view
+confidences $c_k = 0.50$ throughout, an agnostic midpoint; the
+$c$-dependence of the leakage is explicit in the factor $c(1-c)$ of
+\eqref{eq:dceff-exact}. The average asset variance, which
 acts as the Ledoit--Wolf shrinkage target scale, is
 $\mu_s = \tfrac{1}{n}\mathrm{tr}(\hat\Sigma_s) = 0.0282$ annualised
 ($2.35\cdot 10^{-3}$ per month), and the analytic shrinkage intensity is
@@ -247,8 +273,9 @@ The sample covariance estimator is
 \[
   \hat\Sigma_s \;=\; \frac{1}{T-1}\sum_{t=1}^T (r_t - \bar r)(r_t - \bar r)^\top.
 \]
-For $n$ assets and $T$ observations this is reliable only if $T \gg n$.
-Once $n/T$ is not negligible, the eigenvalues of $\hat\Sigma_s$ spread
+For $n$ assets and $T$ observations this is reliable only if $T \gg n$;
+the relative estimation error grows with $n/T$. Once $n/T$ is not
+negligible, the eigenvalues of $\hat\Sigma_s$ spread
 too widely; large eigenvalues are overestimated, small ones are
 underestimated \citep[p.~371]{LedoitWolf2004}. The smallest eigenvalue
 moves toward zero, the condition number
@@ -269,59 +296,90 @@ $\mu_s = \tfrac{1}{n}\mathrm{tr}(\hat\Sigma_s)$,
 \[
   \hat\Sigma_{\LW} \;=\; (1-\alpha)\,\hat\Sigma_s \;+\; \alpha\,\mu_s\,I_n,
 \]
-where the shrinkage coefficient $\alpha\in[0,1]$ minimises the expected
-squared Frobenius error $\E[\|\hat\Sigma - \Sigma\|_F^2]$. Because
-$\alpha\mu_s I_n$ adds at least $\alpha\mu_s>0$ to every eigenvalue,
-$\hat\Sigma_{\LW}\succ 0$ is automatic. On the training window the
-analytic estimator yields $\alpha = 0.041$ and brings the condition
-number down to $\kappa(\hat\Sigma_{\LW}) = 108.0$, a factor $3.2$
-reduction.
+where the oracle shrinkage coefficient $\alpha\in[0,1]$ minimises the
+expected squared Frobenius error $\E[\|\hat\Sigma - \Sigma\|_F^2]$; the
+analytic estimator replaces the unobservable optimum by a consistent
+plug-in $\hat\alpha$. Because $\alpha\mu_s I_n$ adds $\alpha\mu_s>0$ to
+every eigenvalue of $(1-\alpha)\hat\Sigma_s$, $\hat\Sigma_{\LW}\succ 0$
+is automatic. Throughout, we estimate $\hat\alpha$ with the analytic
+implementation of \texttt{scikit-learn} and apply it to the
+$T-1$-normalised sample matrix, so that the identity above holds exactly
+in the empirical pipeline. (The covariance output of
+\texttt{scikit-learn} itself normalises by $T$ and would rescale every
+closed form below by $(T-1)/T$.) On the training window the analytic
+estimator yields $\alpha = 0.041$ and brings the condition number down
+to $\kappa(\hat\Sigma_{\LW}) = 108.0$, a factor $3.2$ reduction.
 
 % ============================================================
-\section{Idzorek $\Omega$: the Estimator Switch is Inert}
+\section{Idzorek $\Omega$: a Single View Is Inert}
 \label{sec:idzorek-cancel}
 % ============================================================
 
 We can keep this case brief. When $\Omega$ is derived from $\Sigma$ via
-Idzorek's formula, the estimator cancels exactly in the view channel.
+Idzorek's calibration, the estimator cancels exactly in the view channel
+of a single view.
 
-Idzorek sets
+Idzorek's confidence calibration leads, in the closed form derived by
+\citet{Walters2014}, to
 \[
-  \omega_{kk} \;=\; \frac{1-c_k}{c_k}\,\tau\,p_k^\top\Sigma p_k,
+  \omega_{kk} \;=\; \frac{1-c_k}{c_k}\,\tau\,p_k^\top\Sigma p_k
 \]
-and the posterior simplifies along the view direction to
+(Idzorek's original procedure matches weight tilts iteratively; the
+closed form is its exact single-view solution). For a single view $p$
+the posterior then simplifies along the view direction to
 \[
-  P\muBL \;=\; (1 - c)\,P\pi \;+\; c\,Q.
+  p^\top\muBL \;=\; (1 - c)\,p^\top\pi \;+\; c\,Q,
 \]
-The view absorption equals $c$ exactly, independent of $\Sigma$.
-Switching $\hat\Sigma_s \to \hat\Sigma_{\LW}$ scales the view variance
-and the matching $\omega$ proportionally, the ratio stays at $c$. The
-entire LW impact on the posterior runs through the prior, and is bounded
-by $\Delta\pi = O(\alpha)$.
+an identity we derive in Section~\ref{sec:dmu-dw}. The view absorption
+equals $c$ exactly, independent of $\Sigma$. Switching
+$\hat\Sigma_s \to \hat\Sigma_{\LW}$ scales the view variance and the
+matching $\omega$ proportionally, the ratio stays at $c$. Along the view
+direction the remaining LW impact runs through the prior spread
+$p^\top\pi$ alone; off the view direction the projection
+$\Sigma p / v_k$ moves as well. Both effects are exactly linear in
+$\alpha$.
 
 Concretely, the LW estimator shifts the prior linearly,
 \[
   \Delta\pi_i \;=\; \alpha\,\delta\,\Bigl[(\mu_s - \sigma_i^2)\,w_{\mathrm{eq},i}
         \;-\; \sum_{j\neq i}\hat\Sigma_{s,ij}\,w_{\mathrm{eq},j}\Bigr].
 \]
-Assets with above-average variance ($\sigma_i^2 > \mu_s$) receive a lower
-prior, assets with below-average variance receive a higher one. On the
-Idzorek universe $|\Delta\pi_i| \leq 0.25\,\%$ p.a.\ for all eight ETFs.
+Assets with above-average variance ($\sigma_i^2 := \hat\Sigma_{s,ii} >
+\mu_s$) receive a lower prior, assets with below-average variance receive
+a higher one. On our universe $|\Delta\pi_i| \leq 0.22\,\%$ p.a.\ for all
+eight ETFs.
 
-The Idzorek world is settled. The interesting case follows.
+\begin{remark}[several views]\label{rem:multiview}
+For $K > 1$ the absorption matrix is $A = S\,(S + \Om)^{-1}$ with
+$S = \tau P\Sigma P^\top$. Idzorek's $\Omega$ matches only
+$\mathrm{diag}(S)$, so off-diagonal elements of $S$ break both the exact
+absorption $c$ and its estimator-invariance. On the three-view setup of
+Section~\ref{sec:backtest} the residuals
+$P\muBL - [(1-c)P\pi + cQ]$ stay below $0.6\,\%$ p.a., and the per-view
+absorption remains within one percentage point of $c = 50\,\%$ and moves
+by less than $0.3$ percentage points between the two estimators---an
+order of magnitude below the fixed-$\Omega$ shifts of
+Section~\ref{sec:fixed-omega}.
+\end{remark}
+
+This settles the Idzorek case for a single view. The fixed-$\Omega$ case
+does not cancel.
 
 % ============================================================
-\section{Fixed $\Omega$: What Happens?}
+\section{Fixed $\Omega$: the Leakage Mechanism}
 \label{sec:fixed-omega}
 % ============================================================
 
-A different workflow appears regularly in practice. The analyst computes
+A different workflow is easy to fall into. The analyst computes
 $\omega_k$ once on the sample estimator and stores the scalars. Later,
-the covariance is replaced by an LW estimator (perhaps because the badly
-conditioned $\hat\Sigma_s^{-1}$ produced obviously implausible leverage),
-but $\omega_k$ stays fixed. The view absorption then shifts implicitly,
-because $\Sigma$ moves in the numerator while $\omega_k$ does not move
-in the denominator.
+the covariance is replaced by an LW estimator, perhaps because the badly
+conditioned $\hat\Sigma_s^{-1}$ produced implausible leverage, but
+$\omega_k$ stays fixed. We are not aware of survey evidence on how
+widespread this workflow is; the point of this section is that whoever
+follows it changes the model's inputs without seeing it. The view
+absorption shifts implicitly, because $\Sigma$ moves in the numerator of
+$c_{\eff,k}$ (defined below) while $\omega_k$ does not move in the
+denominator.
 
 We derive the closed form for the shift in $c_{\eff}$, translate it into
 a general sign-and-size criterion and, for the symmetric case, into a
@@ -342,9 +400,9 @@ The actual view absorption after evaluating the posterior is
 $c_{\eff,k}$ measures how far the posterior travels along the view
 direction from prior toward view. At $c_{\eff,k} = 0$ the posterior
 stays at the prior, at $c_{\eff,k} = 1$ it lands exactly on the view.
-The ratio depends on two quantities, the view variance $v_k$ and the
-view uncertainty $\omega_k$. The role of $\tau$ matters here. $\tau$
-controls how tightly the prior is held; small $\tau$ pulls $c_{\eff,k}$
+The ratio depends on the view variance $v_k$, the view uncertainty
+$\omega_k$, and the prior scale $\tau$, which controls how tightly the
+prior is held: at fixed $\omega_k$, small $\tau$ pulls $c_{\eff,k}$
 down, large $\tau$ lets the posterior move toward the view more easily.
 
 In the Idzorek world with $\omega_k = \tfrac{1-c_k}{c_k}\tau v_k$, both
@@ -366,7 +424,7 @@ when $v_k^\Std < 2\mu_s$, i.e.\ when the view variance lies below twice
 the average asset variance. For positively correlated pairs of similar
 volatility this is the typical case; it also holds for pairs whose
 variances are simply small relative to the universe average, such as
-bond pairs. With $v_k$, the absorption $c_{\eff,k}$ grows.
+bond pairs. As $v_k$ grows, so does the absorption $c_{\eff,k}$.
 
 \subsection{Closed Form for $\Delta c_{\eff,k}$}
 \label{sec:dceff}
@@ -390,8 +448,8 @@ Substituting $v_k^\LW - v_k^\Std = \alpha(2\mu_s - v_k^\Std)$ yields
   \frac{\tau\,\omega_k\,\alpha\,(2\mu_s - v_k^\Std)}
        {(\tau\,v_k^\LW + \omega_k)(\tau\,v_k^\Std + \omega_k)}.
 \end{equation}
-The shift scales linearly in $\alpha$ and $\omega_k$, and its sign
-matches $\mathrm{sgn}(2\mu_s - v_k^\Std)$: the general criterion
+For small $\alpha$ the shift is linear in $\alpha$, and its sign matches
+$\mathrm{sgn}(2\mu_s - v_k^\Std)$ for any $\alpha$: the general criterion
 announced above, valid for arbitrary volatility ratios.
 
 In the workflow under study, $\omega_k$ was calibrated on the sample
@@ -429,9 +487,15 @@ yields the closed-form threshold
               {\sigma^2\,[\varepsilon\,(1 - c\,\alpha) \;+\; c\,(1-c)\,\alpha]},
   \qquad \varepsilon \in (0,\,1-c).
 \end{equation}
-A view triggers $|\Delta c_{\eff,k}| > \varepsilon$ exactly when
+A view triggers $\Delta c_{\eff,k} > \varepsilon$ exactly when
 $\rho_{ij} > \rho^*$. The threshold falls as $\alpha$ rises and as the
-tolerated shift $\varepsilon$ falls. The symmetric case is a structural
+tolerated shift $\varepsilon$ falls. (On the negative branch,
+$\Delta c_{\eff,k} < -\varepsilon$ requires $\rho_{ij}$ below a second
+threshold $\rho^{**}$, which exists once
+$\varepsilon < c(1-c)\alpha/(1-c\alpha)$; at $\alpha = 0.30$ and
+$\varepsilon = 1\,\%$ it sits at $\rho^{**} = -0.32$, at
+$\alpha = 0.041$ it lies far outside $[-1,1]$. The tables below concern
+the positive branch.) The symmetric case is a structural
 sketch rather than the general statement: for $\sigma_i \neq \sigma_j$
 the exact criterion remains \eqref{eq:dceff-exact} evaluated at the
 heterogeneous $v_k^\Std = \sigma_i^2 + \sigma_j^2 -
@@ -442,7 +506,7 @@ pair-level results below.
 \label{sec:values}
 
 Table~\ref{tab:rho-star} shows $\rho^*$ for four shrinkage intensities
-and four significance thresholds. The parameters $\mu_s = 4.0\cdot
+and four tolerance levels $\varepsilon$. The parameters $\mu_s = 4.0\cdot
 10^{-3}$, $\sigma^2 = 3.5\cdot 10^{-3}$, $c = 0.50$ are illustrative,
 chosen of the same order as the monthly quantities in our data
 ($\mathrm{tr}(\hat\Sigma_s)/n = 2.35\cdot 10^{-3}$ per month); the table
@@ -453,7 +517,7 @@ and $c$.
 \centering
 \caption{Critical correlation $\rho^*(\alpha,\varepsilon)$ from
 \eqref{eq:rho-star}. The pair correlation $\rho_{ij}$ must exceed this
-value for $|\Delta c_{\eff}| > \varepsilon$. Illustrative parameters
+value for $\Delta c_{\eff} > \varepsilon$. Illustrative parameters
 $\mu_s = 4.0\cdot 10^{-3}$, $\sigma^2 = 3.5\cdot 10^{-3}$, $c = 0.50$.}
 \label{tab:rho-star}
 \begin{tabular}{lcccc}
@@ -479,39 +543,45 @@ same window sit further to the right in the table.
 The symmetric threshold understates the reach of the effect, because the
 general criterion is $v_k^\Std < 2\mu_s$, not high correlation per se.
 Table~\ref{tab:pairs} evaluates the exact expression
-\eqref{eq:dceff-exact} for every pair of the universe, with the full
-$8\times 8$ covariance shrunk once at $\alpha = 0.041$ (the
-practitioner workflow) and $c = 0.50$. Five of 28 pairs shift by more
-than five percentage points. The top of the list is dominated by the
-highly correlated, nearly homogeneous style pairs, led by IWF/IWD at
-$+10.6$ percentage points---the model operates at an effective
+\eqref{eq:dceff-exact} for every pair of the universe, one view at a
+time, with the full $8\times 8$ covariance shrunk once at
+$\alpha = 0.041$ (the practitioner workflow) and $c = 0.50$; the table
+reports the pairs above the five-point band. Five of 28 pairs shift by
+more than five percentage points. The top of the list is dominated by
+the highly correlated, nearly homogeneous style pairs, led by IWF/IWD at
+$+10.7$ percentage points---the model operates at an effective
 confidence of $0.61$ where the analyst specified $0.50$. But the bond
-pair AGG/BWX ranks third at $+8.1$ percentage points despite a moderate
+pair AGG/BWX ranks third at $+8.2$ percentage points despite a moderate
 correlation of $0.57$: its view variance is small relative to $2\mu_s$
 because bond variances are far below the universe average. A threshold
-stated in correlations alone would miss it.
+stated in correlations alone would miss it. In this universe every one
+of the 28 pairs satisfies $v_k^\Std < 2\mu_s$, so the leakage is a
+one-sided confidence inflation; the deflation regime
+$v_k^\Std > 2\mu_s$ requires pairs whose spread variance exceeds twice
+the universe average, such as weakly correlated high-volatility assets.
 
 \begin{table}[H]
 \centering
 \caption{Exact $\Delta c_{\eff}$ from \eqref{eq:dceff-exact} for all
-pairs with a shift above five percentage points. Full-universe shrinkage
-at $\alpha = 0.041$, $\omega$ frozen on the sample estimator,
+pairs with a shift above five percentage points; each pair is evaluated
+as a single relative view in isolation. Full-universe shrinkage at
+$\alpha = 0.041$, $\omega$ frozen on the sample estimator,
 $c = 0.50$; $k = \sigma_i/\sigma_j$. Training window 2008--2018.}
 \label{tab:pairs}
 \begin{tabular}{lccc}
 \toprule
-Pair & $\rho_{ij}$ & $k$ & $\Delta c_{\eff}$ \\
+Pair & $\rho_{ij}$ & $k$ & $\Delta c_{\eff}$ (pp) \\
 \midrule
-IWF/IWD & $0.920$ & $0.99$ & $+10.6$ pp \\
-IWO/IWN & $0.939$ & $1.03$ & $+8.7$ pp \\
-AGG/BWX & $0.574$ & $0.45$ & $+8.1$ pp \\
-IWD/IWN & $0.917$ & $0.80$ & $+6.4$ pp \\
-IWF/IWO & $0.909$ & $0.77$ & $+5.4$ pp \\
+IWF/IWD & $0.920$ & $0.99$ & $+10.7$ \\
+IWO/IWN & $0.939$ & $1.03$ & $+8.8$ \\
+AGG/BWX & $0.574$ & $0.45$ & $+8.2$ \\
+IWD/IWN & $0.917$ & $0.80$ & $+6.6$ \\
+IWF/IWO & $0.909$ & $0.77$ & $+5.5$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Translated into economic language: whenever a relative view connects two
+In economic terms, whenever a relative view connects two
 assets whose spread variance is small---because they are highly
 correlated, or because both carry little variance to begin with---a
 frozen $\Omega$ lets the shrinkage-induced widening of the spread
@@ -540,7 +610,7 @@ Left-multiplication by $\tau\Sigma$ and solving for $\muBL$:
   \Bigl[I \;+\; \tfrac{\tau}{\omega}\,\Sigma p\,p^\top\Bigr]\,\muBL \;&=\; \pi \;+\; \tfrac{\tau Q}{\omega}\,\Sigma p\\
   \muBL \;+\; \tfrac{\tau\,(p^\top\muBL)}{\omega}\,\Sigma p \;&=\; \pi \;+\; \tfrac{\tau Q}{\omega}\,\Sigma p\\
   \muBL \;&=\; \pi \;+\; \tfrac{\tau\,(Q - p^\top\muBL)}{\omega}\,\Sigma p.
-  \tag{$\star$}\label{eq:bl-implicit}
+  \tag{$\star$}
 \end{align*}
 
 Applying $p^\top$ to $(\star)$ produces a scalar equation in
@@ -579,6 +649,11 @@ the weight expression as well,
 \end{equation}
 The view-driven part of $w_{\mathrm{BL}}$ lies exactly in direction
 $p$, without any assumption on the volatilities.
+Equation~\eqref{eq:bl-single-w} is the single-view case of the
+unconstrained-weights result of \citet{HeLitterman1999}---posterior
+weights are the market weights plus a position in the view
+portfolio---and serves here as the carrier that propagates
+$\Delta c_{\eff}$.
 
 \paragraph{Step 1: $\Delta\mu$ from $\Delta c_{\eff}$.}
 Differencing \eqref{eq:bl-single-exact} at fixed $\pi$, $\Sigma$ and
@@ -646,10 +721,10 @@ $\mu_s^{(2)} = \tfrac{1}{2}\mathrm{tr}(\hat\Sigma_s^{(2)})$, while the
 intensity $\alpha = 0.041$ is the analytic value estimated on the full
 eight-asset universe. (If instead the full $8\times 8$ matrix is shrunk
 and the pair extracted afterwards---the workflow behind
-Table~\ref{tab:pairs}---the smaller universe-wide target
-$\mu_s < \mu_s^{(2)}$ widens the spread variance further and the shift
-grows to $+10.6$ percentage points. The self-contained design is thus
-the conservative one.)
+Table~\ref{tab:pairs}---the larger universe-wide target
+$\mu_s = 0.0282 > \mu_s^{(2)} = 0.0242$ widens the spread variance
+further and the shift grows to $+10.7$ percentage points. The
+self-contained design is thus the conservative one.)
 
 The inputs are
 \begin{align*}
@@ -700,8 +775,8 @@ and $v_k = 0.00389$ from the sample estimator we check
     \;=\; +0.143\,\text{pp},\\
     \Delta w_{\mathrm{IWF}} \;&\approx\; \frac{\Delta c_{\eff}\,(Q-p^\top\pi)}{\delta\,v_k}
     \;=\; \frac{0.0942 \cdot 0.0303}{2.44 \cdot 0.00389}
-    \;=\; +0.301
-    \;=\; +30.1\,\text{pp}.
+    \;\approx\; +0.300
+    \;=\; +30.0\,\text{pp}.
 \end{align*}
 The IWD counterparts have the opposite sign. Both predictions match the
 numerical $\Delta\mu$ and $\Delta w$ to within a few hundredths of a
@@ -717,7 +792,11 @@ points. The posterior pushes IWF up by $0.15$ pp and IWD down by $0.13$
 pp. Through $w = \tfrac{1}{\delta}\Sigma^{-1}\mu$ this return shift
 translates into roughly $\pm 30$ percentage points on the long-short
 spread. The analyst still has $c = 50\,\%$ on the input form. The model
-is operating at $c_{\eff} = 59.42\,\%$.
+is operating at $c_{\eff} = 59.42\,\%$. The absolute position sizes are
+themselves a comment on unconstrained Black--Litterman with a
+$\rho = 0.92$ pair: the translation factor $1/(\delta v_k) \approx 105$
+turns any view into triple-digit tilts, and the leakage rides exactly
+this lever.
 
 \subsection{Implementation in Pseudocode}
 \label{sec:pseudocode}
@@ -725,11 +804,11 @@ is operating at $c_{\eff} = 59.42\,\%$.
 The whole computation reduces to a few lines. Inputs are the sample
 covariance, the analytic Ledoit--Wolf intensity, the market weights,
 $\delta$, $\tau$, and a single relative view $(p, Q, c)$. The function
-\texttt{mu\_bl} solves the linear system from the Black--Litterman
-first-order condition; weights are computed with $\hat\Sigma_s^{-1}$ in
-both scenarios to isolate the view-absorption channel.
+\texttt{mu\_bl} solves the Black--Litterman posterior linear system;
+weights are computed with $\hat\Sigma_s^{-1}$ in both scenarios to
+isolate the view-absorption channel.
 
-\begin{lstlisting}
+\begin{lstlisting}[caption={Single-view leakage computation.},label={lst:pseudo}]
 # ----- Inputs -----
 Sigma_s, alpha, w_eq, delta, tau    # market and estimator parameters
 p, Q, c                             # single relative view: p = e_i - e_j
@@ -783,13 +862,17 @@ The clean fix is to recompute $\omega_k$ alongside $\Sigma$,
 \[
   \omega_k^{\LW} \;=\; \frac{1-c_k}{c_k}\,\tau\,v_k^{\LW}.
 \]
-This restores $c_{\eff,k} = c_k$ exactly. Covariance estimator,
-confidence and view-uncertainty form one unit. Replacing one of the
-three pieces without re-deriving the other two is the source of the
-leakage, not the choice of estimator itself. The point is not academic:
-the analyst who freezes $\Omega$ has, without knowing it, raised the
-confidence of every affected view---a breach of whatever risk-governance
-process produced the original confidences.
+This restores $c_{\eff,k} = c_k$ exactly. The same self-healing holds
+for any $\Omega$ tied functionally to $\Sigma$, for instance the
+He--Litterman convention $\Omega = \mathrm{diag}(P\,\tau\Sigma\,P^\top)$:
+the leakage is a property of frozen scalars, not of a particular
+calibration formula. Covariance estimator, confidence and
+view-uncertainty form one unit. Replacing one of the three pieces
+without re-deriving the other two is the source of the leakage, not the
+choice of estimator itself. The point is not academic: the analyst who
+freezes $\Omega$ has, without knowing it, raised the confidence of every
+affected view, inconsistent with whatever risk-governance process
+produced the original confidences.
 
 % ============================================================
 \section{Conditioning and Precision Channel}
@@ -822,16 +905,18 @@ LW lifts every eigenvalue $\lambda_k$ of $\hat\Sigma_s$,
     \lambda_k^{\LW} \;=\; (1-\alpha)\,\lambda_k \;+\; \alpha\,\mu_s,
     \qquad k = 1,\dots,n.
 \]
-The smallest eigenvalue rises by the largest factor, so
-$1/\lambda_n^{\LW} \ll 1/\lambda_n$. As a result $\hat\Sigma_{\LW}^{-1}$
-is much more uniform than $\hat\Sigma_s^{-1}$. Extreme long-short
-positions, which the badly conditioned estimator produces along
-low-variance directions, get pulled back. On the Idzorek universe the
-condition number drops from $341.8$ to $108.0$; under the three-view
-setup of Section~\ref{sec:backtest}, the IWF position (US large-cap
-growth) falls from $+170.2\,\%$ to $+119.9\,\%$ and the IWD short
-(US large-cap value) from $-133.1\,\%$ to $-81.7\,\%$, taking the gross
-exposure from $4.20$ to $3.10$.
+The smallest eigenvalue rises by the largest factor, so $1/\lambda_n$
+falls the most---on our data by roughly a factor of three. As a result
+$\hat\Sigma_{\LW}^{-1}$ is much more uniform than $\hat\Sigma_s^{-1}$.
+Extreme long-short positions, which the badly conditioned estimator
+produces along low-variance directions, get pulled back. On our universe
+the condition number drops from $341.8$ to $108.0$; under the three-view
+setup of Section~\ref{sec:backtest} (weights via
+$w = \tfrac{1}{\delta}\Sigma^{-1}\muBL$ as defined in
+Section~\ref{sec:blm-brief}), the IWF position (US large-cap growth)
+falls from $+173.5\,\%$ to $+121.0\,\%$ and the IWD short (US large-cap
+value) from $-136.4\,\%$ to $-83.0\,\%$, taking the gross exposure from
+$4.31$ to $3.16$.
 
 % ============================================================
 \section{Out-of-Sample Backtest}
@@ -840,69 +925,97 @@ exposure from $4.20$ to $3.10$.
 
 All weights are estimated once on the training window (January 2008 to
 December 2018) and held constant on the test window (January 2019 to
-December 2024). The three relative views of Section~\ref{sec:blm-brief}
-apply: IWF $>$ IWD by $+3\,\%$ p.a., EEM $>$ EFA by $+4\,\%$ p.a., IWF
-$>$ AGG by $+6\,\%$ p.a., each at confidence $c = 0.50$, $\tau = 0.05$,
-with Idzorek-calibrated $\Omega$ (recomputed per estimator, so the view
-channel is clean by construction). The set follows Idzorek's example
-views in structure---relative pair views with moderate spreads---and is
+December 2024), i.e.\ the portfolios are rebalanced back to fixed
+weights each month. The three relative views of
+Section~\ref{sec:blm-brief} apply: IWF $>$ IWD by $+3\,\%$ p.a., EEM $>$
+EFA by $+4\,\%$ p.a., IWF $>$ AGG by $+6\,\%$ p.a., each at confidence
+$c = 0.50$, $\tau = 0.05$. Three Black--Litterman variants are run: the
+sample estimator; Ledoit--Wolf with Idzorek-$\Omega$ recomputed per
+estimator, so the view channel is clean up to the small multi-view
+cross-terms of Remark~\ref{rem:multiview}; and Ledoit--Wolf with
+$\Omega$ frozen on the sample estimator, the leakage workflow of
+Section~\ref{sec:fixed-omega}. The view set is in the spirit of
+Idzorek's examples---relative pair views with moderate spreads---and is
 deliberately not tuned to the test window; ex post, two views turn out
-right and one wrong. All performance figures are computed on monthly
-excess returns.
+right and one wrong (realised spreads 2019--2024: IWF$-$IWD $+9.1$,
+IWF$-$AGG $+20.3$, EEM$-$EFA $-3.6\,\%$ p.a.). All performance figures
+are arithmetic annualisations of monthly excess returns; the maximum
+drawdown is computed on the compounded excess-return path. Transaction
+costs, shorting fees and margin constraints are ignored, which flatters
+the levered variants; financing at the T-bill rate is implicit in the
+excess-return arithmetic. Relative views leave all portfolios exactly
+fully invested under the weight mapping of Section~\ref{sec:blm-brief}.
 
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.15}
-\caption{Out-of-sample performance (Jan.\,2019--Dec.\,2024), Idzorek
-universe, buy-and-hold weights.
-$\kappa(\hat\Sigma_s) = 341.8$, $\kappa(\hat\Sigma_{\LW}) = 108.0$.}
+\caption{Out-of-sample performance (Jan.\,2019--Dec.\,2024), monthly
+excess returns, weights fixed at inception (monthly rebalancing).
+$\kappa(\hat\Sigma_s) = 341.8$, $\kappa(\hat\Sigma_{\LW}) = 108.0$.
+The Sharpe difference between the sample and recomputed-$\Omega$ LW
+columns is statistically indistinguishable (Memmel test, $p = 0.62$).}
 \label{tab:backtest}
 \small
-\begin{tabular}{lrrr}
+\begin{tabular}{lrrrr}
 \toprule
-Metric & Market equilibrium & BLM (sample) & BLM (Ledoit--Wolf) \\
+Metric & Market eq. & BLM (sample) & BLM (LW, $\Om$ rec.) & BLM (LW, $\Om$ frozen) \\
 \midrule
-Annual return     & $3.85\,\%$   & $17.78\,\%$  & $13.46\,\%$  \\
-Annual volatility & $12.16\,\%$  & $24.39\,\%$  & $19.41\,\%$  \\
-Sharpe ratio      & $0.32$       & $\mathbf{0.73}$ & $0.69$    \\
-Max drawdown      & $-24.78\,\%$ & $-51.30\,\%$ & $-42.26\,\%$ \\
+Annual return     & $3.85\,\%$   & $18.06\,\%$  & $13.54\,\%$  & $15.09\,\%$ \\
+Annual volatility & $12.16\,\%$  & $24.98\,\%$  & $19.81\,\%$  & $21.65\,\%$ \\
+Sharpe ratio      & $0.32$       & $0.72$       & $0.68$       & $0.70$ \\
+Max drawdown      & $-24.78\,\%$ & $-52.34\,\%$ & $-43.06\,\%$ & $-46.79\,\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The largest change in any posterior mean across the two estimators is
-$0.44\,\%$ p.a., of which the pure prior channel contributes at most
-$0.25\,\%$ (Section~\ref{sec:idzorek-cancel}); the remainder enters
-through the $\Sigma$-dependent view projection at unchanged absorption
-$c$. The Idzorek cancellation works as expected, and the performance gap
-is generated almost entirely by the precision channel.
-$\hat\Sigma_s^{-1}$ produces $+170.2\,\%$ in US large-cap growth and
-$-133.1\,\%$ in US large-cap value; $\hat\Sigma_{\LW}^{-1}$ trims these
-to $+119.9\,\%$ and $-81.7\,\%$. Because growth stocks strongly
-outperformed in the test window, the concentrated sample-covariance bet
-pays off ($17.78\,\%$, Sharpe $0.73$). Ledoit--Wolf cuts volatility to
-$19.41\,\%$ and the maximum drawdown to $-42.26\,\%$, at the cost of a
-portion of the upside. Fewer extreme positions mean less risk and less
-return in an up-market. With Idzorek $\Omega$ the LW switch does not
-change the return signal, it only dampens the leverage of the
-optimisation step.
+Compare the first two BLM columns. The largest change in any posterior
+mean across the two estimators is $0.42\,\%$ p.a., of which the pure
+prior channel contributes at most $0.21\,\%$
+(Section~\ref{sec:idzorek-cancel}); the remainder enters through the
+$\Sigma$-dependent view projection at nearly unchanged absorption
+(Remark~\ref{rem:multiview}). The Idzorek cancellation works as
+expected, and the performance gap is generated almost entirely by the
+precision channel. $\hat\Sigma_s^{-1}$ produces $+173.5\,\%$ in US
+large-cap growth and $-136.4\,\%$ in US large-cap value;
+$\hat\Sigma_{\LW}^{-1}$ trims these to $+121.0\,\%$ and $-83.0\,\%$.
+Because growth stocks strongly outperformed in the test window, the
+concentrated sample-covariance bet pays off ($18.06\,\%$, Sharpe
+$0.72$). Ledoit--Wolf cuts volatility to $19.81\,\%$ and the maximum
+drawdown to $-43.06\,\%$, at the cost of a portion of the upside. The
+Sharpe gap is well inside sampling noise over 72 months
+(\citealp{Memmel2003}; see also \citealp{LedoitWolf2008}). Fewer extreme
+positions mean less risk and less return in an up-market. With Idzorek
+$\Omega$ the LW switch does not change the return signal, it only
+dampens the leverage of the optimisation step.
+
+The fourth column prices the leakage of Section~\ref{sec:fixed-omega}
+directly: $\Omega$ is calibrated on $\hat\Sigma_s$, frozen, and the
+covariance is switched to LW. The silently inflated view confidences
+partially restore the concentrated positions that the estimator switch
+was meant to trim (IWF $+140.5\,\%$ against $+121.0\,\%$ with recomputed
+$\Omega$; gross exposure $3.63$ against $3.16$), and with them roughly
+$40\,\%$ of both the exposure reduction and the drawdown improvement
+that the clean LW switch delivers. The analyst who freezes $\Omega$
+forfeits close to half of the de-risking they think they bought.
 
 LW underperforms the sample-covariance BL on annualised return and
 Sharpe in this specific test window, a strong US growth market. The
 mechanism is structural: LW caps the concentrated growth position, and
 because US large-cap growth dominated every other asset class in the
 test period, LW gives up return. The maximum drawdown, however, falls
-from $-51.30\,\%$ to $-42.26\,\%$, a nine-point reduction. This is the
-dimension where LW carries its own weight; a drawdown above $50\,\%$ is
-simply not investable for many institutional mandates, regardless of the
-year-end print. Imposing a long-only constraint instead compresses both
+from $-52.34\,\%$ to $-43.06\,\%$, a nine-percentage-point reduction.
+This is the dimension where LW carries its own weight; a drawdown above
+$50\,\%$ is not investable for many institutional mandates, regardless
+of the realised return. Imposing a long-only constraint instead compresses both
 variants toward each other and toward far tamer risk figures, consistent
 with the observation of \citet[p.~1652]{JagannathanMa2003} that
 no-short-sale constraints act on the same estimation-error leverage that
 shrinkage targets; investors who optimise long-only to begin with gain
 correspondingly little from the estimator switch.
 
-When is LW preferable? Three configurations matter. Regulated portfolios
+Where does LW earn its keep? Three configurations plausibly favour it;
+the list is informed conjecture rather than a tested claim. Regulated
+portfolios
 with explicit drawdown or VaR constraints benefit, because the loss
 limit, not the risk-adjusted return, is the binding constraint. Periods
 of high market volatility or correlation regime shifts are a second
@@ -922,9 +1035,10 @@ Whether the Ledoit--Wolf switch is harmless inside Black--Litterman is
 decided by the treatment of $\Omega$, and both regimes now have closed
 forms. Under Idzorek's calibration
 $\omega_k(\Sigma) = \tfrac{1-c_k}{c_k}\tau\,p_k^\top\Sigma p_k$ the
-absorption $c_{\eff,k}$ is independent of $\Sigma$: any positive-definite
-estimator can be plugged in without distorting the view channel, and the
-posterior impact is confined to the $O(\alpha)$ prior shift. If
+absorption $c_{\eff,k}$ is independent of $\Sigma$ for a single view:
+any positive-definite estimator can be plugged in without distorting the
+view channel, and the posterior impact is confined to prior and
+projection shifts that are exactly linear in $\alpha$. If
 $\omega_k$ is instead computed once and frozen, the estimator switch
 shifts the effective confidence by the exact, $\tau$-free expression
 \eqref{eq:dceff-exact}. The sign criterion is
@@ -932,17 +1046,21 @@ $v_k^\Std \lessgtr 2\mu_s$, the symmetric special case yields the
 closed-form correlation threshold \eqref{eq:rho-star}, and the exact
 single-view identity \eqref{eq:bl-single-exact} propagates the shift
 into posterior means and weights with leverage $1/(\delta v_k)$. On the
-eight-asset Idzorek universe at $\alpha = 0.041$, five of 28 pairs cross
-the five-percentage-point band, led by IWF/IWD at $+10.6$; the bond pair
-AGG/BWX crosses it at a correlation of only $0.57$. Recomputing
-$\omega_k$ alongside $\Sigma$ removes the leakage analytically. The
-lesson is procedural: covariance, confidence and view uncertainty have
-to be kept consistent with each other.
+eight-asset universe at $\alpha = 0.041$, five of 28 pairs cross the
+five-percentage-point band, led by IWF/IWD at $+10.7$; the bond pair
+AGG/BWX crosses it at a correlation of only $0.57$. Out of sample, the
+frozen-$\Omega$ workflow forfeits close to half of the exposure and
+drawdown reduction that the estimator switch was meant to deliver.
+Recomputing $\omega_k$ alongside $\Sigma$ removes the leakage
+analytically. The lesson is procedural: covariance, confidence and view
+uncertainty have to be kept consistent with each other.
 
 Several limitations point to extensions. The closed-form chain covers a
-single relative view; with several simultaneous views the shifts
-interact through the posterior precision, and the multi-view analogue
-(via Sherman--Morrison updates) is work in progress. The empirical part
+single relative view and a diagonal $\Omega$; with several simultaneous
+views the shifts interact through the posterior precision
+(Remark~\ref{rem:multiview} bounds the size of these cross-terms on our
+data), and the multi-view analogue (via Sherman--Morrison updates) we
+leave to future work. The empirical part
 rests on one training/test split of a small, well-diversified ETF
 universe on which the analytic intensity is modest; equity universes
 with larger $n/T$ push $\alpha$, and with it the leakage, substantially
@@ -958,19 +1076,19 @@ the effect under these estimators remains to be mapped out.
 
 All numbers quoted in this paper are produced by the script
 \texttt{code/paper\_numbers.py} from frozen monthly return data
-(\texttt{data/}, sourced from Yahoo Finance), using the same estimation
-pipeline as the underlying thesis code: excess returns, sample
-covariance with $T-1$ normalisation, the analytic Ledoit--Wolf estimator
-of \texttt{scikit-learn}, and implied risk aversion from S\&P~500 excess
-returns. Code and data are available at
-\url{https://github.com/lucasposern/bsc-thesis-capm-blm}.
-% TODO: replace by / add Zenodo DOI 10.5281/zenodo.20787490 once v2.0 is published.
+(\texttt{data/}, sourced from Yahoo Finance). Pipeline: excess returns;
+sample covariance with $T-1$ normalisation; the analytic Ledoit--Wolf
+intensity of \texttt{scikit-learn} applied to that matrix
+(Section~\ref{sec:lw}); weights via
+$w = (\delta\Sigma)^{-1}\mu_{\mathrm{BL}}$; implied risk aversion from
+S\&P~500 excess returns. Code and data are available at
+\url{https://github.com/lucasposern/blm-lw-fixed-omega}.
 
 % ============================================================
 \bibliographystyle{plainnat}
-% TODO (journal stage): switch to BibTeX (../Quellen/quellen.bib) and the
-% target journal's citation style.
-\begin{thebibliography}{19}
+% Hand-maintained bibliography for the draft; switch to BibTeX with the
+% target journal's style at submission.
+\begin{thebibliography}{18}
 
 \bibitem[Best and Grauer(1991)]{BestGrauer1991}
 M.~J. Best and R.~R. Grauer.
@@ -982,6 +1100,12 @@ changes in asset means: Some analytical and computational results.
 F.~Black and R.~Litterman.
 \newblock Global portfolio optimization.
 \newblock \emph{Financial Analysts Journal}, 48(5):28--43, 1992.
+
+\bibitem[Chopra and Ziemba(1993)]{ChopraZiemba1993}
+V.~K. Chopra and W.~T. Ziemba.
+\newblock The effect of errors in means, variances, and covariances on
+optimal portfolio choice.
+\newblock \emph{The Journal of Portfolio Management}, 19(2):6--11, 1993.
 
 \bibitem[DeMiguel et~al.(2009)]{DeMiguelGarlappiUppal2009}
 V.~DeMiguel, L.~Garlappi, and R.~Uppal.
@@ -1026,11 +1150,26 @@ O.~Ledoit and M.~Wolf.
 \newblock \emph{The Journal of Portfolio Management}, 30(4):110--119,
 2004{\natexlab{b}}.
 
+\bibitem[Ledoit and Wolf(2008)]{LedoitWolf2008}
+O.~Ledoit and M.~Wolf.
+\newblock Robust performance hypothesis testing with the Sharpe ratio.
+\newblock \emph{Journal of Empirical Finance}, 15(5):850--859, 2008.
+
 \bibitem[Ledoit and Wolf(2017)]{LedoitWolf2017}
 O.~Ledoit and M.~Wolf.
 \newblock Nonlinear shrinkage of the covariance matrix for portfolio
 selection: Markowitz meets Goldilocks.
 \newblock \emph{The Review of Financial Studies}, 30(12):4349--4388, 2017.
+
+\bibitem[Markowitz(1952)]{Markowitz1952}
+H.~Markowitz.
+\newblock Portfolio selection.
+\newblock \emph{The Journal of Finance}, 7(1):77--91, 1952.
+
+\bibitem[Memmel(2003)]{Memmel2003}
+C.~Memmel.
+\newblock Performance hypothesis testing with the Sharpe ratio.
+\newblock \emph{Finance Letters}, 1(1):21--23, 2003.
 
 \bibitem[Michaud(1989)]{Michaud1989}
 R.~O. Michaud.
@@ -1042,6 +1181,12 @@ S.~Satchell and A.~Scowcroft.
 \newblock A demystification of the Black--Litterman model: Managing
 quantitative and traditional portfolio construction.
 \newblock \emph{Journal of Asset Management}, 1(2):138--150, 2000.
+
+\bibitem[Sharpe(1964)]{Sharpe1964}
+W.~F. Sharpe.
+\newblock Capital asset prices: A theory of market equilibrium under
+conditions of risk.
+\newblock \emph{The Journal of Finance}, 19(3):425--442, 1964.
 
 \bibitem[Walters(2014)]{Walters2014}
 J.~Walters.

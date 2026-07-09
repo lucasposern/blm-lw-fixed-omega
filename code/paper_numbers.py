@@ -8,18 +8,28 @@ Reproduces every number quoted in the standalone paper
      Fixed-Omega Leakage and the Critical Correlation Threshold"
     (main.tex)
 
-from the frozen offline data in data/, using the exact thesis pipeline
-in core/ (excess returns, sample_cov ddof=1, sklearn Ledoit-Wolf,
-implied risk aversion from S&P 500 excess returns). No network access.
+from the frozen offline data in data/, using the thesis pipeline in
+core/ with two conventions pinned for exactness (revision 2026-07 v2):
+
+  * Sigma_LW = (1 - alpha) * Sigma_s + alpha * mu_s * I, with alpha from
+    sklearn's analytic estimator but applied to the ddof=1 sample matrix.
+    (sklearn's own covariance output normalises by T and would rescale
+    every closed form in the paper by (T-1)/T.)
+  * Weights via w = (delta * Sigma)^{-1} mu_BL exactly as stated in the
+    paper (add_M_to_Sigma=False), NOT the He-Litterman Sigma_post = Sigma + M.
+    Relative views then keep the portfolios exactly fully invested.
 
 Sections
 --------
   [1] Universe, estimators, condition numbers, shrinkage intensity
-  [2] Prior shift Delta pi under Idzorek-Omega (O(alpha) channel)
-  [3] Corrected critical-correlation table rho*(alpha, eps)  (symmetric case)
+  [2] Prior shift Delta pi under Idzorek-Omega (linear-in-alpha channel)
+  [3] Critical-correlation table rho*(alpha, eps)  (symmetric case)
   [4] Exact per-pair Delta c_eff for all 28 pairs (heterogeneous, exact)
   [5] Clean 2x2 example IWF/IWD (both shrinkage designs)
-  [6] Out-of-sample backtest Jan 2019 - Dec 2024 (incl. long-only, cvxpy)
+  [6] Out-of-sample backtest Jan 2019 - Dec 2024
+      (sample / LW with recomputed Omega / LW with frozen Omega,
+       multi-view absorption diagnostics for Remark 1, Memmel test,
+       long-only twins via cvxpy if available)
 
 Run:  python code/paper_numbers.py     (from the repo root)
 
@@ -27,6 +37,7 @@ Author: Lucas Posern
 """
 from __future__ import annotations
 
+import math
 import os
 import sys
 from pathlib import Path
@@ -37,10 +48,10 @@ import pandas as pd
 ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, str(ROOT / "core"))
 
-from covariance import sample_cov, ledoit_wolf_cov            # noqa: E402
-from views import ViewSet                                      # noqa: E402
-from black_litterman import run_blm, implied_risk_aversion     # noqa: E402
-from portfolio_metrics import performance_summary              # noqa: E402
+from covariance import sample_cov                               # noqa: E402
+from views import ViewSet                                        # noqa: E402
+from black_litterman import run_blm, implied_risk_aversion      # noqa: E402
+from portfolio_metrics import performance_summary               # noqa: E402
 
 # ----------------------------------------------------------------------------
 # Parameters (identical to thesis chapter 5.1)
@@ -77,19 +88,37 @@ def kappa(S: np.ndarray) -> float:
     return float(np.linalg.cond(S))
 
 
+def memmel_test(r1: pd.Series, r2: pd.Series) -> tuple[float, float]:
+    """Memmel (2003) corrected Jobson-Korkie test on monthly Sharpe ratios."""
+    s1 = r1.mean() / r1.std(ddof=1)
+    s2 = r2.mean() / r2.std(ddof=1)
+    rho = float(np.corrcoef(r1, r2)[0, 1])
+    T = len(r1)
+    var = (2 * (1 - rho) + 0.5 * (s1 ** 2 + s2 ** 2
+           - s1 * s2 * (1 + rho ** 2))) / T
+    z = (s1 - s2) / math.sqrt(var)
+    p = 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
+    return z, p
+
+
 def main() -> None:
     excess_train, excess_test, mkt_train, w_eq = load_all()
     T, n = excess_train.shape
     assets = TICKERS
 
     # ------------------------------------------------------------------
-    # [1] Estimators (thesis pipeline, annualized, on excess returns)
+    # [1] Estimators (annualized, on excess returns)
+    #     Convention: alpha from sklearn's analytic estimator, applied to
+    #     the ddof=1 sample matrix, so Sigma_LW = (1-a) Sigma_s + a mu_s I
+    #     holds EXACTLY (paper Section 4).
     # ------------------------------------------------------------------
     Sigma_s = sample_cov(excess_train, annualize=True, frequency="M")
-    Sigma_lw = ledoit_wolf_cov(excess_train, annualize=True, frequency="M")
     from sklearn.covariance import LedoitWolf
     alpha = float(LedoitWolf().fit(excess_train.values).shrinkage_)
     mu_s_ann = float(np.trace(Sigma_s.values) / n)
+    Sigma_lw = pd.DataFrame(
+        (1 - alpha) * Sigma_s.values + alpha * mu_s_ann * np.eye(n),
+        index=Sigma_s.index, columns=Sigma_s.columns)
     delta = implied_risk_aversion(mkt_train, annualize=True, frequency="M")
 
     print("=" * 72)
@@ -111,15 +140,15 @@ def main() -> None:
     d_pi = delta * (Sigma_lw.values - Sigma_s.values) @ w_eq.values
     print()
     print("=" * 72)
-    print("[2] PRIOR SHIFT Delta pi (annualized, only LW channel under "
-          "Idzorek-Omega)")
+    print("[2] PRIOR SHIFT Delta pi = alpha*delta*(mu_s I - Sigma_s) w_eq "
+          "(annualized)")
     print("=" * 72)
     for a, dp in zip(assets, d_pi):
         print(f"  {a}: {100 * dp:+.3f} % p.a.")
-    print(f"max |Delta pi| = {100 * np.max(np.abs(d_pi)):.2f} % p.a.")
+    print(f"max |Delta pi| = {100 * np.max(np.abs(d_pi)):.3f} % p.a.")
 
     # ------------------------------------------------------------------
-    # [3] Corrected rho*(alpha, eps) table (symmetric case)
+    # [3] rho*(alpha, eps) table (symmetric case)
     # ------------------------------------------------------------------
     # Illustrative parameters as printed in the paper table; same order of
     # magnitude as the monthly quantities in [1]. The table depends only on
@@ -127,9 +156,16 @@ def main() -> None:
     MU_S_ILL, SIG2_ILL, c = 4e-3, 3.5e-3, C_CONF
 
     def rho_star(a: float, eps: float) -> float:
-        """Corrected closed form (thesis eq. rho_star)."""
+        """Closed form, positive branch (Delta c_eff = +eps)."""
         return 1 - (c * a * MU_S_ILL * ((1 - c) - eps)) / (
             SIG2_ILL * (eps * (1 - c * a) + c * (1 - c) * a))
+
+    def rho_star_neg(a: float, eps: float) -> float:
+        """Negative branch (Delta c_eff = -eps); exists iff denominator > 0."""
+        den = SIG2_ILL * (c * (1 - c) * a - eps * (1 - c * a))
+        if den <= 0:
+            return float("nan")
+        return 1 - (c * a * MU_S_ILL * ((1 - c) + eps)) / den
 
     def dceff_sym(rho: float, a: float) -> float:
         """Exact Delta c_eff, symmetric case, omega frozen on sample."""
@@ -141,7 +177,7 @@ def main() -> None:
     epss = [0.01, 0.02, 0.05, 0.10]
     print()
     print("=" * 72)
-    print("[3] CORRECTED rho*(alpha, eps)  [mu_s=4e-3, sigma^2=3.5e-3, c=0.5]")
+    print("[3] rho*(alpha, eps)  [mu_s=4e-3, sigma^2=3.5e-3, c=0.5]")
     print("=" * 72)
     print("eps    " + "".join(f"a={a:<8}" for a in alphas))
     for eps in epss:
@@ -151,13 +187,16 @@ def main() -> None:
                 assert abs(dceff_sym(rs, a) - eps) < 1e-10, (a, eps)
         print(f"{eps:<7}" + "".join(f"{v:<10.3f}" for v in row))
     print("(each entry verified: Delta c_eff(rho*, alpha) == eps to 1e-10)")
+    print(f"negative branch (paper Sec. 6.4): rho**(0.30, 1%) = "
+          f"{rho_star_neg(0.30, 0.01):.3f}, "
+          f"rho**(0.041, 1%) = {rho_star_neg(0.041, 0.01):.1f} (outside [-1,1])")
 
     # ------------------------------------------------------------------
     # [4] Exact per-pair Delta c_eff (heterogeneous, no approximation)
     # ------------------------------------------------------------------
     # Practitioner design: shrink the FULL 8x8 covariance once, then evaluate
-    # every relative view p = e_i - e_j on the same pair of matrices.
-    # Delta c_eff is computed exactly from v_std, v_lw (scale-invariant).
+    # every relative view p = e_i - e_j on the same pair of matrices,
+    # one view at a time. Delta c_eff is exact from v_std, v_lw.
     Ss, Sl = Sigma_s.values, Sigma_lw.values
     print()
     print("=" * 72)
@@ -180,7 +219,9 @@ def main() -> None:
         flag = "  <-- > 5pp" if dc > 0.05 else ""
         print(f"{a}/{b:<5}{rho:>7.3f}{k:>9.2f}{100 * dc:>+9.2f}pp{flag}")
     print(f"\npairs with Delta c_eff > 5pp: "
-          f"{sum(1 for x in rows if x[0] > 0.05)} of {len(rows)}")
+          f"{sum(1 for x in rows if x[0] > 0.05)} of {len(rows)}; "
+          f"negative pairs: {sum(1 for x in rows if x[0] < 0)} "
+          f"(all pairs satisfy v_std < 2 mu_s in this universe)")
 
     # ------------------------------------------------------------------
     # [5] Clean 2x2 example IWF/IWD
@@ -251,17 +292,24 @@ def main() -> None:
     run_2x2(S2_s, S2_lw_A, "Design A: shrink extracted 2x2 (own target)")
 
     # Design B (practitioner check): shrink full 8x8, then extract the block.
+    # The universe-wide target mu_s exceeds the pair target mu_s^(2), so the
+    # spread variance widens further and the shift grows (paper Sec. 6.6).
     S2_lw_B = Sl[np.ix_([i, j], [i, j])]
     run_2x2(S2_s, S2_lw_B, "Design B: extract from full-universe shrinkage")
+    print(f"mu_s (universe) = {mu_s_ann:.5f}  >  mu_s^(2) (pair) = {mu2:.5f}")
 
     # ------------------------------------------------------------------
-    # [6] Out-of-sample backtest (thesis view set, Idzorek-Omega)
+    # [6] Out-of-sample backtest (thesis view set)
+    #     Three BLM variants: sample / LW with recomputed Idzorek-Omega /
+    #     LW with Omega frozen on the sample estimator (the leakage case).
+    #     Weights: w = (delta * Sigma)^{-1} mu_BL  (paper Section 2).
     # ------------------------------------------------------------------
     print("=" * 72)
-    print("[6] BACKTEST Jan 2019 - Dec 2024 (buy-and-hold, Idzorek-Omega)")
+    print("[6] BACKTEST Jan 2019 - Dec 2024 "
+          "(constant weights, monthly rebalancing)")
     print("=" * 72)
 
-    def blm_weights(Sigma_used: pd.DataFrame) -> pd.Series:
+    def build_views(Sigma_used: pd.DataFrame):
         vs = ViewSet(asset_names=assets)
         vs.add_relative(["IWF"], ["IWD"], expected_diff=0.03,
                         confidence=0.50, label="IWF>IWD +3%")
@@ -269,35 +317,58 @@ def main() -> None:
                         confidence=0.50, label="EEM>EFA +4%")
         vs.add_relative(["IWF"], ["AGG"], expected_diff=0.06,
                         confidence=0.50, label="IWF>AGG +6%")
-        P, Q, Omega = vs.build(Sigma=Sigma_used, tau=TAU,
-                               omega_method="idzorek")
-        res = run_blm(Sigma_used, w_eq, P, Q, Omega, delta=delta, tau=TAU)
-        return res["w_BL"], res["mu_BL"]
+        return vs.build(Sigma=Sigma_used, tau=TAU, omega_method="idzorek")
 
-    w_bl_s, mu_bl_s = blm_weights(Sigma_s)
-    w_bl_l, mu_bl_l = blm_weights(Sigma_lw)
+    def blm_run(Sigma_used: pd.DataFrame, omega_from: pd.DataFrame):
+        """BLM with Omega calibrated on omega_from (frozen if != Sigma_used)."""
+        P, Q, _ = build_views(Sigma_used)
+        _, _, Omega = build_views(omega_from)
+        res = run_blm(Sigma_used, w_eq, P, Q, Omega, delta=delta, tau=TAU,
+                      add_M_to_Sigma=False)   # w = (delta Sigma)^-1 mu_BL
+        return res
 
-    print("BLM weights (sample):      "
-          + ", ".join(f"{a} {100 * w:+.1f}%" for a, w in w_bl_s.items()))
-    print("BLM weights (Ledoit-Wolf): "
-          + ", ".join(f"{a} {100 * w:+.1f}%" for a, w in w_bl_l.items()))
+    res_s = blm_run(Sigma_s, Sigma_s)
+    res_l = blm_run(Sigma_lw, Sigma_lw)      # Omega recomputed (clean)
+    res_f = blm_run(Sigma_lw, Sigma_s)       # Omega frozen on sample (leakage)
+
+    for tag, res in [("sample", res_s), ("LW, recomputed Omega", res_l),
+                     ("LW, frozen Omega", res_f)]:
+        w = res["w_BL"]
+        print(f"BLM weights ({tag}): "
+              + ", ".join(f"{a} {100 * x:+.1f}%" for a, x in w.items()))
+        print(f"   gross {np.abs(w.values).sum():.2f}, "
+              f"net {w.values.sum():.4f}")
     print(f"max |mu_BL_lw - mu_BL_s| = "
-          f"{100 * np.max(np.abs(mu_bl_l.values - mu_bl_s.values)):.2f} % p.a.")
-    print(f"gross exposure: sample {np.abs(w_bl_s.values).sum():.2f}, "
-          f"LW {np.abs(w_bl_l.values).sum():.2f}")
+          f"{100 * np.max(np.abs(res_l['mu_BL'].values - res_s['mu_BL'].values)):.3f} % p.a.; "
+          f"prior channel max = "
+          f"{100 * np.max(np.abs(res_l['pi'].values - res_s['pi'].values)):.3f} % p.a.")
+
+    # multi-view absorption diagnostics (paper Remark 1)
+    P, Q, Om_s = build_views(Sigma_s)
+    _, _, Om_l = build_views(Sigma_lw)
+    for tag, S, Om, res in [("sample", Sigma_s, Om_s, res_s),
+                            ("LW", Sigma_lw, Om_l, res_l)]:
+        Smat = P @ (TAU * S.values) @ P.T
+        absorb = Smat @ np.linalg.inv(Smat + Om)
+        resid = P @ res["mu_BL"].values - (
+            (1 - C_CONF) * P @ res["pi"].values + C_CONF * Q)
+        print(f"Remark-1 diagnostics ({tag}): absorption diag = "
+              f"{np.round(np.diag(absorb), 4)}, residuals (% p.a.) = "
+              f"{np.round(100 * resid, 3)}")
 
     ports = {
         "Market equilibrium": excess_test @ w_eq.values,
-        "BLM (sample)": excess_test @ w_bl_s.values,
-        "BLM (Ledoit-Wolf)": excess_test @ w_bl_l.values,
+        "BLM (sample)": excess_test @ res_s["w_BL"].values,
+        "BLM (LW, Omega recomputed)": excess_test @ res_l["w_BL"].values,
+        "BLM (LW, Omega frozen)": excess_test @ res_f["w_BL"].values,
     }
 
     # long-only twins (cvxpy QP, as in thesis section 5.1)
     try:
         from optimize import mv_weights
         for name, (S, mu) in {
-            "BLM (sample, long-only)": (Sigma_s, mu_bl_s),
-            "BLM (LW, long-only)": (Sigma_lw, mu_bl_l),
+            "BLM (sample, long-only)": (Sigma_s, res_s["mu_BL"]),
+            "BLM (LW, long-only)": (Sigma_lw, res_l["mu_BL"]),
         }.items():
             w_lo = mv_weights(mu, S, delta=delta, long_only=True)
             ports[name] = excess_test @ (
@@ -309,7 +380,12 @@ def main() -> None:
     summary = performance_summary(ports, frequency=12)
     with pd.option_context("display.float_format", "{:8.4f}".format,
                            "display.width", 120):
-        print(summary.to_string(index=False))
+        print(summary.to_string())
+
+    z, pval = memmel_test(ports["BLM (sample)"],
+                          ports["BLM (LW, Omega recomputed)"])
+    print(f"\nSharpe difference sample vs LW (recomputed Omega): "
+          f"Memmel z = {z:.2f}, p = {pval:.2f}  -> not significant")
 
 
 if __name__ == "__main__":

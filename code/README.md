@@ -31,6 +31,16 @@ the out-of-sample backtest 2019-2024.
 
 ## History / caveats
 
+- **2026-07 revision 2 (referee fixes).** Two conventions pinned for
+  exactness: (i) Σ_LW = (1−α)Σ_s + α·μ_s·I with sklearn's analytic α
+  applied to the ddof=1 sample matrix (sklearn's own covariance output
+  normalises by T and would rescale every closed form by (T−1)/T);
+  (ii) weights via w = (δΣ)⁻¹μ_BL exactly as in the paper
+  (`add_M_to_Sigma=False`), not He-Litterman's Σ_post = Σ + M.
+  Backtest gains a third BLM column (LW with frozen Ω = the leakage case),
+  multi-view absorption diagnostics (paper Remark 1) and a Memmel (2003)
+  Sharpe-difference test. Numbers changed at the 0.1–0.5pp level
+  (e.g. IWF/IWD pair shift +10.6 → +10.7pp; backtest 17.78 → 18.06%).
 - **2026-07 revision.** `main.tex` replaces `tau_omega_independence_BLM.tex`
   (old draft, kept for reference). The old draft and the pre-revision
   `rho_star_table.py` contained an incorrect ρ* formula (factor-2 error:
@@ -45,10 +55,18 @@ the out-of-sample backtest 2019-2024.
 ## Method notes
 
 - **Ledoit-Wolf.** α from the analytic sklearn estimator
-  (`LedoitWolf().fit(X).shrinkage_`), applied on monthly excess returns.
+  (`LedoitWolf().fit(X).shrinkage_`) on monthly excess returns; the
+  shrinkage is then applied to the ddof=1 sample matrix so that
+  Σ_LW = (1−α)Σ_s + α·μ_s·I holds exactly (see History above).
+- **Weights.** w = (δΣ)⁻¹μ_BL throughout; relative views keep the
+  portfolios exactly fully invested (net weight 1.0000, printed).
 - **Frozen Ω.** ω = (1−c)/c · τ · pᵀΣ_s p is calibrated once on the sample
   estimator and kept fixed when Σ switches to Ledoit-Wolf; that frozen ω is
-  the source of the c_eff drift.
+  the source of the c_eff drift. The backtest now runs this workflow
+  out of sample as a third BLM column.
 - **Channel isolation.** The 2x2 example uses Σ_s⁻¹ in the weight step for
   both scenarios, so the reported Δw reflects only the view-absorption
   channel, not the change in Σ⁻¹ (treated separately in the paper).
+- **Performance conventions.** Arithmetic annualisation (mean ×12,
+  vol ×√12) on monthly excess returns; max drawdown on the compounded
+  excess-return path; no transaction or shorting costs.
