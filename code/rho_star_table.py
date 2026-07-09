@@ -1,18 +1,25 @@
 """
 rho_star_table.py
 =================
-Reproduces Table (rho-star) of the report: the critical correlation
+Reproduces the critical-correlation table of the paper (main.tex):
 
-    rho*(alpha, eps) = 1 - alpha*mu_s*[c(1-c) - eps]
-                           / ( sigma^2 * [c(1-c)*alpha + eps*(2 - alpha)] )
+    rho*(alpha, eps) = 1 - c*alpha*mu_s*[(1-c) - eps]
+                           / ( sigma^2 * [eps*(1 - c*alpha) + c*(1-c)*alpha] )
 
-A symmetric relative view triggers |Delta c_eff| > eps once rho_ij > rho*.
-Pure analytic, no data download required.
+with eps in (0, 1-c). A symmetric relative view (sigma_i = sigma_j) triggers
+|Delta c_eff| > eps once rho_ij > rho*.
+
+NOTE (2026-07): this replaces an earlier, incorrect version of the formula
+(a factor-2 error shifted every row of the table by one eps level). Each
+entry below is verified by numerically checking the exact Delta c_eff.
+
+Pure analytic, no data required. For every number in the paper, including
+the exact per-pair evaluation without the symmetry assumption, run
+paper_numbers.py instead.
 """
 
-import numpy as np
-
-# Report parameters (Section "Example Values")
+# Illustrative parameters (Section "Values and Economic Statement");
+# only the ratio mu_s/sigma^2 and c matter.
 MU_S = 0.004      # average asset variance (monthly order of magnitude)
 SIGMA2 = 0.0035   # per-asset variance
 C = 0.50          # stated confidence
@@ -22,9 +29,17 @@ EPSILONS = [0.01, 0.02, 0.05, 0.10]
 
 
 def rho_star(alpha, eps, mu_s=MU_S, sigma2=SIGMA2, c=C):
-    num = alpha * mu_s * (c * (1 - c) - eps)
-    den = sigma2 * (c * (1 - c) * alpha + eps * (2 - alpha))
+    """Corrected closed form; eps must lie in (0, 1-c)."""
+    num = c * alpha * mu_s * ((1 - c) - eps)
+    den = sigma2 * (eps * (1 - c * alpha) + c * (1 - c) * alpha)
     return 1.0 - num / den
+
+
+def dceff_symmetric(rho, alpha, mu_s=MU_S, sigma2=SIGMA2, c=C):
+    """Exact Delta c_eff in the symmetric case, omega frozen on sample."""
+    v_std = 2 * sigma2 * (1 - rho)
+    v_lw = (1 - alpha) * v_std + 2 * alpha * mu_s
+    return c * (1 - c) * (v_lw - v_std) / (c * v_lw + (1 - c) * v_std)
 
 
 def main():
@@ -33,12 +48,19 @@ def main():
     print(header)
     print("  " + "-" * (len(header) - 2))
     for eps in EPSILONS:
-        row = "".join(f"  {rho_star(a, eps):6.3f}" for a in ALPHAS)
+        vals = []
+        for a in ALPHAS:
+            rs = rho_star(a, eps)
+            if -0.999 < rs < 1.0:  # verify against the exact expression
+                assert abs(dceff_symmetric(rs, a) - eps) < 1e-12, (a, eps)
+            vals.append(rs)
+        row = "".join(f"  {v:6.3f}" for v in vals)
         print(f"  {eps*100:6.0f}%    |{row}")
 
     print(
-        "\nReading: at alpha=0.04, eps=5%, any symmetric pair with rho > 0.915 "
-        "\ndrifts c_eff by more than 5 percentage points."
+        "\nReading: at alpha=0.04, eps=5%, any symmetric pair with rho > 0.826"
+        "\ndrifts c_eff by more than 5 percentage points. Every entry is"
+        "\nverified against the exact Delta c_eff (assertion above)."
     )
 
 
