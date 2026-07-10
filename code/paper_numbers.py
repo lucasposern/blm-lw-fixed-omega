@@ -387,6 +387,62 @@ def main() -> None:
     print(f"\nSharpe difference sample vs LW (recomputed Omega): "
           f"Memmel z = {z:.2f}, p = {pval:.2f}  -> not significant")
 
+    # ------------------------------------------------------------------
+    # [7] General view vectors and edge cases (main_v2.tex additions)
+    # ------------------------------------------------------------------
+    print()
+    print("=" * 72)
+    print("[7] GENERAL VIEW VECTORS AND EDGE CASES (main_v2.tex)")
+    print("=" * 72)
+    Ssv, Slv = Sigma_s.values, Sigma_lw.values
+
+    def dceff(v: float, vl: float) -> float:
+        return (C_CONF * (1 - C_CONF) * (vl - v)
+                / (C_CONF * vl + (1 - C_CONF) * v))
+
+    print(f"absolute views p = e_i (criterion sigma_i^2 vs "
+          f"mu_s = {mu_s_ann:.5f}):")
+    for idx, t in enumerate(assets):
+        p = np.zeros(n)
+        p[idx] = 1.0
+        v = float(p @ Ssv @ p)
+        vl = float(p @ Slv @ p)
+        # identity v_LW = (1-a) v + a mu_s ||p||^2 holds exactly:
+        assert abs(vl - ((1 - alpha) * v + alpha * mu_s_ann * (p @ p))) < 1e-12
+        print(f"  {t}: sigma^2 = {v:.5f} {'<' if v < mu_s_ann else '>'} mu_s"
+              f"  ->  dc = {100 * dceff(v, vl):+.2f}pp")
+
+    p = np.zeros(n)
+    p[[2, 4]] = 0.5      # IWF, IWO
+    p[[3, 5]] = -0.5     # IWD, IWN
+    v = float(p @ Ssv @ p)
+    vl = float(p @ Slv @ p)
+    print(f"basket (IWF+IWO)/2 > (IWD+IWN)/2: ||p||^2 = {float(p @ p):.2f},"
+          f"  dc = {100 * dceff(v, vl):+.2f}pp")
+
+    floor = -C_CONF * (1 - C_CONF) * alpha / (1 - C_CONF * alpha)
+    print(f"deflation floor -c(1-c)a/(1-ca) = {100 * floor:+.2f}pp; "
+          f"dc is strictly decreasing in v with range (floor, 1-c)")
+
+    i, j = assets.index("IWF"), assets.index("IWD")
+    p = np.zeros(n)
+    p[i], p[j] = 1.0, -1.0
+    v = float(p @ Ssv @ p)
+    vl = float(p @ Slv @ p)
+    c_star = 1 / (1 + math.sqrt(vl / v))
+    cs = np.linspace(0.01, 0.99, 981)
+    dcs = [c * (1 - c) * (vl - v) / (c * vl + (1 - c) * v) for c in cs]
+    print(f"worst-case confidence (IWF/IWD): c* = {c_star:.3f} "
+          f"(numeric argmax {cs[int(np.argmax(dcs))]:.3f}), "
+          f"dc(c*) = {100 * max(dcs):+.2f}pp vs dc(0.50) = "
+          f"{100 * dceff(v, vl):+.2f}pp")
+
+    for al in (0.041, 0.30):
+        vv = 4 * 3.5e-3                       # symmetric rho = -1, illustrative
+        vl2 = (1 - al) * vv + 2 * al * 4e-3
+        print(f"symmetric rho = -1 (illustrative params), alpha = {al}: "
+              f"dc = {100 * (0.5 * 0.5 * (vl2 - vv) / (0.5 * vl2 + 0.5 * vv)):+.2f}pp")
+
 
 if __name__ == "__main__":
     main()

@@ -31,6 +31,14 @@ the out-of-sample backtest 2019-2024.
 
 ## History / caveats
 
+- **2026-07 extension pass (`main_v2.tex`).** Edge cases closed: general
+  view vectors (v_LW = (1−α)v + α·μ_s·‖p‖², criterion v ≶ μ_s‖p‖²;
+  absolute view AGG +12.9pp = largest leakage, EEM −0.5pp = realised
+  deflation, basket +5.8pp), strict monotonicity in v with range
+  (−c(1−c)α/(1−cα), 1−c) incl. deflation floor (answers ρ=−1),
+  PD-boundary notes (ρ=±1 as continuous limits), worst-case confidence
+  c* = 1/(1+√(v_LW/v)). Numbers in section [7] of `paper_numbers.py`.
+  `main.tex` = referee-fix state without extensions.
 - **2026-07 revision 2 (referee fixes).** Two conventions pinned for
   exactness: (i) Σ_LW = (1−α)Σ_s + α·μ_s·I with sklearn's analytic α
   applied to the ddof=1 sample matrix (sklearn's own covariance output
