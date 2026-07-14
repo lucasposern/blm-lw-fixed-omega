@@ -11,7 +11,8 @@ Implements:
   - single-view Black-Litterman posterior  mu_BL
   - Idzorek omega calibration  omega = (1-c)/c * tau * p' Sigma p
 
-All formulas match the equations in tau_omega_independence_BLM.tex.
+All formulas match the equations in the superseded old draft
+(tau_omega_independence_BLM.tex, removed from the tree; see git history).
 """
 
 from __future__ import annotations

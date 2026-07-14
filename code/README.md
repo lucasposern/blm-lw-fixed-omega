@@ -53,7 +53,8 @@ the out-of-sample backtest 2019-2024.
   (e.g. IWF/IWD pair shift +10.6 → +10.7pp; backtest 17.78 → 18.06%).
 - **2026-07 revision.** `main.tex` (since renamed, see consolidation
   above) replaced `tau_omega_independence_BLM.tex`
-  (old draft, kept for reference). The old draft and the pre-revision
+  (old draft, since removed from the tree; in git history if needed).
+  The old draft and the pre-revision
   `rho_star_table.py` contained an incorrect ρ* formula (factor-2 error:
   every table row shifted by one ε level). Corrected and verified against
   the exact Δc_eff; do not quote the old table.

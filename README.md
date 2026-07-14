@@ -23,7 +23,6 @@ de-risking the estimator switch was meant to deliver.
 | `code/core/` | Frozen thesis pipeline (covariance, views, BLM, metrics, QP) |
 | `code/README.md` | Conventions, method notes, changelog |
 | `data/` | Frozen monthly excess-return inputs (Yahoo Finance vintage) |
-| `tau_omega_independence_BLM.tex` | Superseded old draft (kept for reference; do not quote) |
 
 ## Reproduce
 
