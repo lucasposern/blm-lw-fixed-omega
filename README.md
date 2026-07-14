@@ -38,4 +38,4 @@ w = (δΣ)⁻¹μ_BL. Details in `code/README.md`.
 
 ## License
 
-Code: MIT (see `LICENSE`). Paper text: © Lucas Posern.
+© Lucas Posern. All rights reserved.

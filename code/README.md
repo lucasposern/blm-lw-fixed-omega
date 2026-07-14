@@ -28,9 +28,6 @@ outside the repo.)
 | `paper_numbers.py` | **every number in `fixed_omega.tex`** | `../data/` (offline) |
 | `core/` | frozen thesis pipeline (covariance, views, BLM, metrics, QP) | — |
 | `rho_star_table.py` | standalone ρ\*(α, ε) table, corrected formula | offline |
-| `blm_core.py` | legacy helpers (old report) | — |
-| `example_positive_iwf_iwd.py` | legacy: positive drift example (old report) | yfinance |
-| `example_negative_tlt_iwf.py` | legacy: negative drift TLT/IWF (old report) | yfinance |
 
 ## History / caveats
 
@@ -61,11 +58,8 @@ outside the repo.)
   `rho_star_table.py` contained an incorrect ρ* formula (factor-2 error:
   every table row shifted by one ε level). Corrected and verified against
   the exact Δc_eff; do not quote the old table.
-- The legacy yfinance examples use total returns and live downloads; the
-  paper pipeline uses frozen excess returns. Numbers can differ in the last
-  digit. The TLT/IWF negative-drift example is not part of the current
-  paper (TLT is outside the Idzorek universe) but is kept as a candidate
-  for a sign-reversal illustration in a later revision.
+- The legacy yfinance example scripts and helpers from the old report
+  were removed from the tree; recover them via git history if needed.
 
 ## Method notes
 
