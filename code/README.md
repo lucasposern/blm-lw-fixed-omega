@@ -16,7 +16,10 @@ risk aversion from S&P 500 excess returns) via the modules in `core/`
 (frozen copies of the thesis code). Sections: estimators and condition
 numbers, prior shift Δπ, corrected ρ*(α, ε) table, exact per-pair Δc_eff
 for all 28 pairs, the 2x2 IWF/IWD example (both shrinkage designs), and
-the out-of-sample backtest 2019-2024.
+the three-view weights and posterior diagnostics on the estimation
+window. (The 2019-2024 out-of-sample performance evaluation was removed
+together with the backtest section of the paper; recover both via git
+history.)
 
 ## Files
 
@@ -47,10 +50,10 @@ the out-of-sample backtest 2019-2024.
   normalises by T and would rescale every closed form by (T−1)/T);
   (ii) weights via w = (δΣ)⁻¹μ_BL exactly as in the paper
   (`add_M_to_Sigma=False`), not He-Litterman's Σ_post = Σ + M.
-  Backtest gains a third BLM column (LW with frozen Ω = the leakage case),
-  multi-view absorption diagnostics (paper Remark 1) and a Memmel (2003)
-  Sharpe-difference test. Numbers changed at the 0.1–0.5pp level
-  (e.g. IWF/IWD pair shift +10.6 → +10.7pp; backtest 17.78 → 18.06%).
+  The three-view section gains a third BLM column (LW with frozen Ω =
+  the leakage case) and multi-view absorption diagnostics (paper
+  Remark 1). Numbers changed at the 0.1–0.5pp level
+  (e.g. IWF/IWD pair shift +10.6 → +10.7pp).
 - **2026-07 revision.** `main.tex` (since renamed, see consolidation
   above) replaced `tau_omega_independence_BLM.tex`
   (old draft, since removed from the tree; in git history if needed).
@@ -74,8 +77,8 @@ the out-of-sample backtest 2019-2024.
   portfolios exactly fully invested (net weight 1.0000, printed).
 - **Frozen Ω.** ω = (1−c)/c · τ · pᵀΣ_s p is calibrated once on the sample
   estimator and kept fixed when Σ switches to Ledoit-Wolf; that frozen ω is
-  the source of the c_eff drift. The backtest now runs this workflow
-  out of sample as a third BLM column.
+  the source of the c_eff drift. Section [6] reports this workflow as a
+  third BLM weights column on the estimation window.
 - **Channel isolation.** The 2x2 example uses Σ_s⁻¹ in the weight step for
   both scenarios, so the reported Δw reflects only the view-absorption
   channel, not the change in Σ⁻¹ (treated separately in the paper).

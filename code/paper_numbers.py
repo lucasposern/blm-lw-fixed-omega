@@ -26,10 +26,12 @@ Sections
   [3] Critical-correlation table rho*(alpha, eps)  (symmetric case)
   [4] Exact per-pair Delta c_eff for all 28 pairs (heterogeneous, exact)
   [5] Clean 2x2 example IWF/IWD (both shrinkage designs)
-  [6] Out-of-sample backtest Jan 2019 - Dec 2024
-      (sample / LW with recomputed Omega / LW with frozen Omega,
-       multi-view absorption diagnostics for Remark 1, Memmel test,
-       long-only twins via cvxpy if available)
+  [6] Three-view weights and posterior diagnostics on the estimation
+      window (sample / LW with recomputed Omega / LW with frozen Omega,
+      multi-view absorption diagnostics for Remark 1)
+      [6b] The out-of-sample performance evaluation (2019-2024 backtest,
+      Memmel test, long-only twins) was removed together with the
+      backtest section of the paper; recover it via git history.
 
 Run:  python code/paper_numbers.py     (from the repo root)
 
@@ -51,7 +53,6 @@ sys.path.insert(0, str(ROOT / "core"))
 from covariance import sample_cov                               # noqa: E402
 from views import ViewSet                                        # noqa: E402
 from black_litterman import run_blm, implied_risk_aversion      # noqa: E402
-from portfolio_metrics import performance_summary               # noqa: E402
 
 # ----------------------------------------------------------------------------
 # Parameters (identical to thesis chapter 5.1)
@@ -86,19 +87,6 @@ def load_all():
 
 def kappa(S: np.ndarray) -> float:
     return float(np.linalg.cond(S))
-
-
-def memmel_test(r1: pd.Series, r2: pd.Series) -> tuple[float, float]:
-    """Memmel (2003) corrected Jobson-Korkie test on monthly Sharpe ratios."""
-    s1 = r1.mean() / r1.std(ddof=1)
-    s2 = r2.mean() / r2.std(ddof=1)
-    rho = float(np.corrcoef(r1, r2)[0, 1])
-    T = len(r1)
-    var = (2 * (1 - rho) + 0.5 * (s1 ** 2 + s2 ** 2
-           - s1 * s2 * (1 + rho ** 2))) / T
-    z = (s1 - s2) / math.sqrt(var)
-    p = 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
-    return z, p
 
 
 def main() -> None:
@@ -299,14 +287,14 @@ def main() -> None:
     print(f"mu_s (universe) = {mu_s_ann:.5f}  >  mu_s^(2) (pair) = {mu2:.5f}")
 
     # ------------------------------------------------------------------
-    # [6] Out-of-sample backtest (thesis view set)
+    # [6] Three-view weights and posterior diagnostics (estimation window)
     #     Three BLM variants: sample / LW with recomputed Idzorek-Omega /
     #     LW with Omega frozen on the sample estimator (the leakage case).
     #     Weights: w = (delta * Sigma)^{-1} mu_BL  (paper Section 2).
+    #     All quantities below use the estimation window only.
     # ------------------------------------------------------------------
     print("=" * 72)
-    print("[6] BACKTEST Jan 2019 - Dec 2024 "
-          "(constant weights, monthly rebalancing)")
+    print("[6] THREE-VIEW WEIGHTS AND DIAGNOSTICS (estimation window)")
     print("=" * 72)
 
     def build_views(Sigma_used: pd.DataFrame):
@@ -356,37 +344,10 @@ def main() -> None:
               f"{np.round(np.diag(absorb), 4)}, residuals (% p.a.) = "
               f"{np.round(100 * resid, 3)}")
 
-    ports = {
-        "Market equilibrium": excess_test @ w_eq.values,
-        "BLM (sample)": excess_test @ res_s["w_BL"].values,
-        "BLM (LW, Omega recomputed)": excess_test @ res_l["w_BL"].values,
-        "BLM (LW, Omega frozen)": excess_test @ res_f["w_BL"].values,
-    }
-
-    # long-only twins (cvxpy QP, as in thesis section 5.1)
-    try:
-        from optimize import mv_weights
-        for name, (S, mu) in {
-            "BLM (sample, long-only)": (Sigma_s, res_s["mu_BL"]),
-            "BLM (LW, long-only)": (Sigma_lw, res_l["mu_BL"]),
-            "BLM (LW frozen, long-only)": (Sigma_lw, res_f["mu_BL"]),
-        }.items():
-            w_lo = mv_weights(mu, S, delta=delta, long_only=True)
-            ports[name] = excess_test @ (
-                w_lo.values if hasattr(w_lo, "values") else np.asarray(w_lo))
-    except Exception as e:  # pragma: no cover
-        print(f"(long-only skipped: {type(e).__name__}: {e})")
-
-    print()
-    summary = performance_summary(ports, frequency=12)
-    with pd.option_context("display.float_format", "{:8.4f}".format,
-                           "display.width", 120):
-        print(summary.to_string())
-
-    z, pval = memmel_test(ports["BLM (sample)"],
-                          ports["BLM (LW, Omega recomputed)"])
-    print(f"\nSharpe difference sample vs LW (recomputed Omega): "
-          f"Memmel z = {z:.2f}, p = {pval:.2f}  -> not significant")
+    # [6b] The out-of-sample performance evaluation (2019-2024 portfolio
+    #      returns, performance summary, Memmel test, long-only twins via
+    #      cvxpy) was removed together with the backtest section of the
+    #      paper. Recover it from git history if the section is re-enabled.
 
     # ------------------------------------------------------------------
     # [7] General view vectors and edge cases (fixed_omega.tex, extension pass)
