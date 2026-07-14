@@ -369,6 +369,7 @@ def main() -> None:
         for name, (S, mu) in {
             "BLM (sample, long-only)": (Sigma_s, res_s["mu_BL"]),
             "BLM (LW, long-only)": (Sigma_lw, res_l["mu_BL"]),
+            "BLM (LW frozen, long-only)": (Sigma_lw, res_f["mu_BL"]),
         }.items():
             w_lo = mv_weights(mu, S, delta=delta, long_only=True)
             ports[name] = excess_test @ (
