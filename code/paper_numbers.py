@@ -31,7 +31,8 @@ Sections
       multi-view absorption diagnostics for Remark 1)
       [6b] The out-of-sample performance evaluation (2019-2024 backtest,
       Memmel test, long-only twins) was removed together with the
-      backtest section of the paper; recover it via git history.
+      backtest section of the paper; it lives locally in
+      code/backtest_local.py (gitignored, not in the repo).
 
 Run:  python code/paper_numbers.py     (from the repo root)
 
@@ -347,7 +348,7 @@ def main() -> None:
     # [6b] The out-of-sample performance evaluation (2019-2024 portfolio
     #      returns, performance summary, Memmel test, long-only twins via
     #      cvxpy) was removed together with the backtest section of the
-    #      paper. Recover it from git history if the section is re-enabled.
+    #      paper; it lives locally in code/backtest_local.py (gitignored).
 
     # ------------------------------------------------------------------
     # [7] General view vectors and edge cases (fixed_omega.tex, extension pass)

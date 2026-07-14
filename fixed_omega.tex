@@ -33,6 +33,9 @@
 %  in the precision-channel section); Memmel/LW2008 refs parked;
 %  strict style pass (em-dash density, active voice, contrast formulas);
 %  "training window" -> "estimation window" throughout.
+%  Revision 2026-07 v5: pseudocode subsection removed; backtest
+%  block converted from \iffalse to plain %-comments; backtest
+%  evaluation code moved to local, gitignored code/backtest_local.py.
 % ============================================================
 
 \documentclass[a4paper,11pt]{article}
@@ -50,24 +53,7 @@
 \usepackage{caption}
 \usepackage{xcolor}
 \usepackage[round]{natbib}
-\usepackage{listings}
 \usepackage[colorlinks=true, linkcolor=blue!70!black, citecolor=blue!70!black, urlcolor=blue!70!black]{hyperref}
-
-\lstset{
-  language=Python,
-  basicstyle=\ttfamily\footnotesize,
-  keywordstyle=\color{blue!70!black}\bfseries,
-  commentstyle=\color{green!40!black}\itshape,
-  stringstyle=\color{red!70!black},
-  breaklines=true,
-  columns=fullflexible,
-  showstringspaces=false,
-  frame=single,
-  framerule=0.4pt,
-  rulecolor=\color{gray!60},
-  xleftmargin=4pt,
-  xrightmargin=4pt,
-}
 
 % ------------------------------------------------------------
 % Theorem environments
@@ -906,63 +892,6 @@ highly correlated pairs: the translation factor
 $1/(\delta v_k) \approx 105$ turns any view into triple-digit tilts,
 and the leakage is amplified by the same factor.
 
-\subsection{Implementation in Pseudocode}
-\label{sec:pseudocode}
-
-The whole computation reduces to a few lines. Inputs are the sample
-covariance, the analytic Ledoit--Wolf intensity, the market weights,
-$\delta$, $\tau$, and a single relative view $(p, Q, c)$. The function
-\texttt{mu\_bl} solves the Black--Litterman posterior linear system;
-weights are computed with $\hat\Sigma_s^{-1}$ in both scenarios to
-isolate the view-absorption channel.
-
-\begin{lstlisting}[caption={Single-view leakage computation.},label={lst:pseudo}]
-# ----- Inputs -----
-Sigma_s, alpha, w_eq, delta, tau    # market and estimator parameters
-p, Q, c                             # single relative view: p = e_i - e_j
-
-# ----- Ledoit-Wolf estimator -----
-n        = dim(Sigma_s)
-mu_s     = trace(Sigma_s) / n
-Sigma_lw = (1 - alpha) * Sigma_s + alpha * mu_s * I_n
-
-# ----- View variance under both estimators -----
-v_std = p.T @ Sigma_s  @ p
-v_lw  = p.T @ Sigma_lw @ p
-
-# ----- Idzorek omega, frozen on Sample-Sigma -----
-omega = ((1 - c) / c) * tau * v_std
-
-# ----- Effective view absorption -----
-c_eff_std = tau * v_std / (tau * v_std + omega)   # equals c by construction
-c_eff_lw  = tau * v_lw  / (tau * v_lw  + omega)
-
-# ----- BL posterior (single relative view) -----
-pi = delta * Sigma_s @ w_eq
-
-def mu_bl(Sigma):
-    M = inv(tau * Sigma) + outer(p, p) / omega
-    b = inv(tau * Sigma) @ pi + p * Q / omega
-    return solve(M, b)
-
-mu_BL_std = mu_bl(Sigma_s)
-mu_BL_lw  = mu_bl(Sigma_lw)
-
-# ----- Weights (return-channel isolation: same Sigma^-1) -----
-w_BL_std = solve(Sigma_s, mu_BL_std) / delta
-w_BL_lw  = solve(Sigma_s, mu_BL_lw)  / delta
-
-# ----- Output -----
-delta_c_eff = c_eff_lw - c_eff_std      # scalar
-delta_mu    = mu_BL_lw - mu_BL_std      # (n,) vector
-delta_w     = w_BL_lw  - w_BL_std       # (n,) vector
-\end{lstlisting}
-
-\noindent
-On the IWF/IWD inputs from Section~\ref{sec:example} the routine returns
-\texttt{delta\_c\_eff = +0.0942}, \texttt{delta\_mu = (+0.0015, -0.0013)}
-and \texttt{delta\_w = (+0.302, -0.298)}, matching the boxed result.
-
 \subsection{Recommendation}
 \label{sec:rec}
 
@@ -1059,129 +988,123 @@ evaluation on subsequent data would add only a single realised path of
 this trade-off; we therefore report the weight-level cost.
 
 % ============================================================
-% The out-of-sample backtest of earlier drafts is parked below in an
-% \iffalse block. Rationale: the closed forms are identities, the
-% weight- and exposure-level consequences of the leakage are
-% estimation-window facts (now reported in Section 7), and a
-% performance evaluation adds only a single realised path of the
-% confidence-as-leverage trade-off. Re-enable by deleting \iffalse/\fi
-% and restoring the Memmel/LedoitWolf2008 references in the
-% bibliography and section [6b] of code/paper_numbers.py.
+% Out-of-sample backtest (removed from the paper): the closed forms
+% are identities and the weight-level cost of the frozen-Omega
+% workflow is reported in Section 7. The evaluation code lives
+% locally in code/backtest_local.py (gitignored, not in the repo).
 % ============================================================
-\iffalse
-% ============================================================
-\section{Out-of-Sample Backtest}
-\label{sec:backtest}
-% ============================================================
-
-All weights are estimated once on the training window (January 2008 to
-December 2018) and held constant on the test window (January 2019 to
-December 2024), i.e.\ the portfolios are rebalanced back to fixed
-weights each month. The three relative views of
-Section~\ref{sec:blm-brief} apply: IWF $>$ IWD by $+3\,\%$ p.a., EEM $>$
-EFA by $+4\,\%$ p.a., IWF $>$ AGG by $+6\,\%$ p.a., each at confidence
-$c = 0.50$, $\tau = 0.05$. Three Black--Litterman variants are run: the
-sample estimator; Ledoit--Wolf with Idzorek-$\Omega$ recomputed per
-estimator, so the view channel is clean up to the small multi-view
-cross-terms of Remark~\ref{rem:multiview}; and Ledoit--Wolf with
-$\Omega$ frozen on the sample estimator, the leakage workflow of
-Section~\ref{sec:fixed-omega}. The view set follows Idzorek's examples
-(relative pair views with moderate spreads). Because the test window is
-known to us, the performance levels below are illustrative; the object
-of interest is the comparison across the three $\Omega$-treatments,
-which share identical views. Ex post, two views turn out
-right and one wrong (realised spreads 2019--2024: IWF$-$IWD $+9.1$,
-IWF$-$AGG $+20.3$, EEM$-$EFA $-3.6\,\%$ p.a.). All performance figures
-are arithmetic annualisations of monthly excess returns; the maximum
-drawdown is computed on the compounded excess-return path. Transaction
-costs, shorting fees and margin constraints are ignored, which flatters
-the levered variants; financing at the T-bill rate is implicit in the
-excess-return arithmetic. Relative views leave all portfolios exactly
-fully invested under the weight mapping of Section~\ref{sec:blm-brief}.
-
-\begin{table}[H]
-\centering
-\renewcommand{\arraystretch}{1.15}
-\caption{Out-of-sample performance (Jan.\,2019--Dec.\,2024), monthly
-excess returns, weights fixed at inception (monthly rebalancing).
-$\kappa(\hat\Sigma_s) = 341.8$, $\kappa(\hat\Sigma_{\LW}) = 108.0$.
-The Sharpe difference between the sample and recomputed-$\Omega$ LW
-columns is statistically indistinguishable (Memmel test, $p = 0.62$).}
-\label{tab:backtest}
-\small
-\begin{tabular}{lrrrr}
-\toprule
-Metric & Market eq. & BLM (sample) & BLM (LW, $\Om$ rec.) & BLM (LW, $\Om$ frozen) \\
-\midrule
-Annual return     & $3.85\,\%$   & $18.06\,\%$  & $13.54\,\%$  & $15.09\,\%$ \\
-Annual volatility & $12.16\,\%$  & $24.98\,\%$  & $19.81\,\%$  & $21.65\,\%$ \\
-Sharpe ratio      & $0.32$       & $0.72$       & $0.68$       & $0.70$ \\
-Max drawdown      & $-24.78\,\%$ & $-52.34\,\%$ & $-43.06\,\%$ & $-46.79\,\%$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Compare the first two BLM columns. The largest change in any posterior
-mean across the two estimators is $0.42\,\%$ p.a., of which the pure
-prior channel contributes at most $0.21\,\%$
-(Section~\ref{sec:idzorek-cancel}); the remainder enters through the
-$\Sigma$-dependent view projection at nearly unchanged absorption
-(Remark~\ref{rem:multiview}). The Idzorek cancellation works as
-expected, and the performance gap is generated almost entirely by the
-precision channel. $\hat\Sigma_s^{-1}$ produces $+173.5\,\%$ in US
-large-cap growth and $-136.4\,\%$ in US large-cap value;
-$\hat\Sigma_{\LW}^{-1}$ trims these to $+121.0\,\%$ and $-83.0\,\%$.
-Because growth stocks strongly outperformed in the test window, the
-concentrated sample-covariance bet pays off ($18.06\,\%$, Sharpe
-$0.72$). Ledoit--Wolf cuts volatility to $19.81\,\%$ and the maximum
-drawdown to $-43.06\,\%$, at the cost of a portion of the upside. The
-Sharpe gap is well inside sampling noise over 72 months
-(\citealp{Memmel2003}; see also \citealp{LedoitWolf2008}). Fewer extreme
-positions mean less risk and less return in an up-market. With Idzorek
-$\Omega$ the LW switch does not change the return signal, it only
-dampens the leverage of the optimisation step.
-
-The fourth column quantifies the leakage of Section~\ref{sec:fixed-omega}
-directly: $\Omega$ is calibrated on $\hat\Sigma_s$, frozen, and the
-covariance is switched to LW. The silently inflated view confidences
-partially restore the concentrated positions that the estimator switch
-was meant to trim (IWF $+140.5\,\%$ against $+121.0\,\%$ with recomputed
-$\Omega$; gross exposure $3.63$ against $3.16$), and with them roughly
-$40\,\%$ of both the exposure reduction and the drawdown improvement
-that the clean LW switch delivers.
-
-LW underperforms the sample-covariance BL on annualised return and
-Sharpe in this specific test window, a strong US growth market. The
-mechanism is structural: LW caps the concentrated growth position, and
-because US large-cap growth dominated every other asset class in the
-test period, LW gives up return. The maximum drawdown, however, falls
-from $-52.34\,\%$ to $-43.06\,\%$, a nine-percentage-point reduction.
-The drawdown reduction is where LW adds value in this window; drawdowns
-above $50\,\%$ breach common institutional loss limits. Imposing a
-long-only constraint instead compresses all three variants toward each
-other and toward far tamer risk figures: annualised volatilities of
-$15.1\,\%$, $15.4\,\%$ and $15.7\,\%$ and maximum drawdowns of
-$-28.3\,\%$, $-29.2\,\%$ and $-29.2\,\%$ for the sample,
-recomputed-$\Omega$ and frozen-$\Omega$ variants (reproduced by the
-accompanying code). This is consistent
-with the observation of \citet[p.~1652]{JagannathanMa2003} that
-no-short-sale constraints act on the same estimation-error leverage that
-shrinkage targets; investors who optimise long-only to begin with gain
-correspondingly little from the estimator switch.
-
-Three configurations plausibly favour LW; we state them as
-conjectures. Regulated
-portfolios
-with explicit drawdown or VaR constraints benefit, because the loss
-limit, not the risk-adjusted return, is the binding constraint. Periods
-of high market volatility or correlation regime shifts are a second
-case, because badly conditioned sample estimators tend to produce
-spurious extreme positions, especially after short training windows or
-at low $T/n$. And third, whenever the training window contains a
-structural regime anomaly (such as the unusually wide eigenvalue spreads
-of 2008--2009) that enters the sample covariance and distorts the
-weights held during the test window.
-\fi
+% % ============================================================
+% \section{Out-of-Sample Backtest}
+% \label{sec:backtest}
+% % ============================================================
+%
+% All weights are estimated once on the training window (January 2008 to
+% December 2018) and held constant on the test window (January 2019 to
+% December 2024), i.e.\ the portfolios are rebalanced back to fixed
+% weights each month. The three relative views of
+% Section~\ref{sec:blm-brief} apply: IWF $>$ IWD by $+3\,\%$ p.a., EEM $>$
+% EFA by $+4\,\%$ p.a., IWF $>$ AGG by $+6\,\%$ p.a., each at confidence
+% $c = 0.50$, $\tau = 0.05$. Three Black--Litterman variants are run: the
+% sample estimator; Ledoit--Wolf with Idzorek-$\Omega$ recomputed per
+% estimator, so the view channel is clean up to the small multi-view
+% cross-terms of Remark~\ref{rem:multiview}; and Ledoit--Wolf with
+% $\Omega$ frozen on the sample estimator, the leakage workflow of
+% Section~\ref{sec:fixed-omega}. The view set follows Idzorek's examples
+% (relative pair views with moderate spreads). Because the test window is
+% known to us, the performance levels below are illustrative; the object
+% of interest is the comparison across the three $\Omega$-treatments,
+% which share identical views. Ex post, two views turn out
+% right and one wrong (realised spreads 2019--2024: IWF$-$IWD $+9.1$,
+% IWF$-$AGG $+20.3$, EEM$-$EFA $-3.6\,\%$ p.a.). All performance figures
+% are arithmetic annualisations of monthly excess returns; the maximum
+% drawdown is computed on the compounded excess-return path. Transaction
+% costs, shorting fees and margin constraints are ignored, which flatters
+% the levered variants; financing at the T-bill rate is implicit in the
+% excess-return arithmetic. Relative views leave all portfolios exactly
+% fully invested under the weight mapping of Section~\ref{sec:blm-brief}.
+%
+% \begin{table}[H]
+% \centering
+% \renewcommand{\arraystretch}{1.15}
+% \caption{Out-of-sample performance (Jan.\,2019--Dec.\,2024), monthly
+% excess returns, weights fixed at inception (monthly rebalancing).
+% $\kappa(\hat\Sigma_s) = 341.8$, $\kappa(\hat\Sigma_{\LW}) = 108.0$.
+% The Sharpe difference between the sample and recomputed-$\Omega$ LW
+% columns is statistically indistinguishable (Memmel test, $p = 0.62$).}
+% \label{tab:backtest}
+% \small
+% \begin{tabular}{lrrrr}
+% \toprule
+% Metric & Market eq. & BLM (sample) & BLM (LW, $\Om$ rec.) & BLM (LW, $\Om$ frozen) \\
+% \midrule
+% Annual return     & $3.85\,\%$   & $18.06\,\%$  & $13.54\,\%$  & $15.09\,\%$ \\
+% Annual volatility & $12.16\,\%$  & $24.98\,\%$  & $19.81\,\%$  & $21.65\,\%$ \\
+% Sharpe ratio      & $0.32$       & $0.72$       & $0.68$       & $0.70$ \\
+% Max drawdown      & $-24.78\,\%$ & $-52.34\,\%$ & $-43.06\,\%$ & $-46.79\,\%$ \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+%
+% Compare the first two BLM columns. The largest change in any posterior
+% mean across the two estimators is $0.42\,\%$ p.a., of which the pure
+% prior channel contributes at most $0.21\,\%$
+% (Section~\ref{sec:idzorek-cancel}); the remainder enters through the
+% $\Sigma$-dependent view projection at nearly unchanged absorption
+% (Remark~\ref{rem:multiview}). The Idzorek cancellation works as
+% expected, and the performance gap is generated almost entirely by the
+% precision channel. $\hat\Sigma_s^{-1}$ produces $+173.5\,\%$ in US
+% large-cap growth and $-136.4\,\%$ in US large-cap value;
+% $\hat\Sigma_{\LW}^{-1}$ trims these to $+121.0\,\%$ and $-83.0\,\%$.
+% Because growth stocks strongly outperformed in the test window, the
+% concentrated sample-covariance bet pays off ($18.06\,\%$, Sharpe
+% $0.72$). Ledoit--Wolf cuts volatility to $19.81\,\%$ and the maximum
+% drawdown to $-43.06\,\%$, at the cost of a portion of the upside. The
+% Sharpe gap is well inside sampling noise over 72 months
+% (\citealp{Memmel2003}; see also \citealp{LedoitWolf2008}). Fewer extreme
+% positions mean less risk and less return in an up-market. With Idzorek
+% $\Omega$ the LW switch does not change the return signal, it only
+% dampens the leverage of the optimisation step.
+%
+% The fourth column quantifies the leakage of Section~\ref{sec:fixed-omega}
+% directly: $\Omega$ is calibrated on $\hat\Sigma_s$, frozen, and the
+% covariance is switched to LW. The silently inflated view confidences
+% partially restore the concentrated positions that the estimator switch
+% was meant to trim (IWF $+140.5\,\%$ against $+121.0\,\%$ with recomputed
+% $\Omega$; gross exposure $3.63$ against $3.16$), and with them roughly
+% $40\,\%$ of both the exposure reduction and the drawdown improvement
+% that the clean LW switch delivers.
+%
+% LW underperforms the sample-covariance BL on annualised return and
+% Sharpe in this specific test window, a strong US growth market. The
+% mechanism is structural: LW caps the concentrated growth position, and
+% because US large-cap growth dominated every other asset class in the
+% test period, LW gives up return. The maximum drawdown, however, falls
+% from $-52.34\,\%$ to $-43.06\,\%$, a nine-percentage-point reduction.
+% The drawdown reduction is where LW adds value in this window; drawdowns
+% above $50\,\%$ breach common institutional loss limits. Imposing a
+% long-only constraint instead compresses all three variants toward each
+% other and toward far tamer risk figures: annualised volatilities of
+% $15.1\,\%$, $15.4\,\%$ and $15.7\,\%$ and maximum drawdowns of
+% $-28.3\,\%$, $-29.2\,\%$ and $-29.2\,\%$ for the sample,
+% recomputed-$\Omega$ and frozen-$\Omega$ variants (reproduced by the
+% accompanying code). This is consistent
+% with the observation of \citet[p.~1652]{JagannathanMa2003} that
+% no-short-sale constraints act on the same estimation-error leverage that
+% shrinkage targets; investors who optimise long-only to begin with gain
+% correspondingly little from the estimator switch.
+%
+% Three configurations plausibly favour LW; we state them as
+% conjectures. Regulated
+% portfolios
+% with explicit drawdown or VaR constraints benefit, because the loss
+% limit, not the risk-adjusted return, is the binding constraint. Periods
+% of high market volatility or correlation regime shifts are a second
+% case, because badly conditioned sample estimators tend to produce
+% spurious extreme positions, especially after short training windows or
+% at low $T/n$. And third, whenever the training window contains a
+% structural regime anomaly (such as the unusually wide eigenvalue spreads
+% of 2008--2009) that enters the sample covariance and distorts the
+% weights held during the test window.
 
 % ============================================================
 \section{Conclusion}

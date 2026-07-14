@@ -18,8 +18,8 @@ numbers, prior shift Δπ, corrected ρ*(α, ε) table, exact per-pair Δc_eff
 for all 28 pairs, the 2x2 IWF/IWD example (both shrinkage designs), and
 the three-view weights and posterior diagnostics on the estimation
 window. (The 2019-2024 out-of-sample performance evaluation was removed
-together with the backtest section of the paper; recover both via git
-history.)
+together with the backtest section of the paper and is kept locally
+outside the repo.)
 
 ## Files
 

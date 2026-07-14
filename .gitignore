@@ -13,3 +13,6 @@ __pycache__/
 
 # macOS
 .DS_Store
+
+# Local-only backtest evaluation (removed from the paper)
+code/backtest_local.py
