@@ -6,7 +6,7 @@ Reproduces every number quoted in the standalone paper
 
     "Black-Litterman with Ledoit-Wolf Shrinkage:
      Fixed-Omega Leakage and the Critical Correlation Threshold"
-    (main.tex)
+    (fixed_omega.tex)
 
 from the frozen offline data in data/, using the thesis pipeline in
 core/ with two conventions pinned for exactness (revision 2026-07 v2):
@@ -388,11 +388,11 @@ def main() -> None:
           f"Memmel z = {z:.2f}, p = {pval:.2f}  -> not significant")
 
     # ------------------------------------------------------------------
-    # [7] General view vectors and edge cases (main_v2.tex additions)
+    # [7] General view vectors and edge cases (fixed_omega.tex, extension pass)
     # ------------------------------------------------------------------
     print()
     print("=" * 72)
-    print("[7] GENERAL VIEW VECTORS AND EDGE CASES (main_v2.tex)")
+    print("[7] GENERAL VIEW VECTORS AND EDGE CASES (fixed_omega.tex)")
     print("=" * 72)
     Ssv, Slv = Sigma_s.values, Sigma_lw.values
 

@@ -1,7 +1,7 @@
 """
 rho_star_table.py
 =================
-Reproduces the critical-correlation table of the paper (main.tex):
+Reproduces the critical-correlation table of the paper (fixed_omega.tex):
 
     rho*(alpha, eps) = 1 - c*alpha*mu_s*[(1-c) - eps]
                            / ( sigma^2 * [eps*(1 - c*alpha) + c*(1-c)*alpha] )

@@ -18,7 +18,7 @@ de-risking the estimator switch was meant to deliver.
 
 | Path | Content |
 |------|---------|
-| `main.tex` / `main.pdf` | The paper (compiled on Overleaf) |
+| `fixed_omega.tex` / `fixed_omega.pdf` | The paper (compiled on Overleaf) |
 | `code/paper_numbers.py` | Reproduces **every number** in the paper from `data/` |
 | `code/core/` | Frozen thesis pipeline (covariance, views, BLM, metrics, QP) |
 | `code/README.md` | Conventions, method notes, changelog |

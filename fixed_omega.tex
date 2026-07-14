@@ -16,6 +16,10 @@
 %  throughout, frozen-Omega backtest column, Memmel test, corrected
 %  mu_s inequality in 6.6, attribution fixes (Walters, He-Litterman),
 %  new refs (Markowitz, Sharpe, Chopra-Ziemba, Memmel, LW 2008).
+%  Extension pass (this file, fixed_omega.tex; formerly main_v2.tex): general view vectors
+%  (criterion v vs mu_s*||p||^2, absolute/basket examples), range and
+%  deflation floor (Remark 2), PD-boundary notes, worst-case c*;
+%  numbers reproduced by section [7] of code/paper_numbers.py.
 % ============================================================
 
 \documentclass[a4paper,11pt]{article}
@@ -107,7 +111,10 @@ $c_{\eff}$ shifts by a closed-form amount that is independent of the prior
 scale $\tau$ and grows with the shrinkage intensity. The shift is positive
 precisely when the view variance lies below twice the average asset
 variance, a condition met by relative views on highly correlated pairs
-\emph{and} on low-variance (bond) pairs. We derive an exact expression for
+\emph{and} on low-variance (bond) pairs; for a general view vector the
+threshold is $\mu_s\lVert p\rVert^2$, and on our data an absolute view
+on the lowest-variance asset shifts by $+12.9$ points, more than any
+pair. We derive an exact expression for
 the induced changes in posterior means and weights under a single relative
 view, provide a closed-form critical correlation threshold, and quantify
 the effect on an ETF implementation of Idzorek's eight-asset universe: at
@@ -384,8 +391,9 @@ denominator.
 We derive the closed form for the shift in $c_{\eff}$, translate it into
 a general sign-and-size criterion and, for the symmetric case, into a
 critical correlation threshold, and verify the chain on the IWF/IWD
-pair. Throughout this section the analysis rests on a single relative
-view; the symmetric per-component statements additionally assume
+pair. Throughout this section the analysis rests on a single view, taken as
+the relative pair $p = e_i - e_j$ unless stated otherwise; the
+symmetric per-component statements additionally assume
 $\sigma_i \approx \sigma_j$ for the view pair, an assumption we make
 explicit where it is used and drop where it is not needed.
 
@@ -426,6 +434,24 @@ volatility this is the typical case; it also holds for pairs whose
 variances are simply small relative to the universe average, such as
 bond pairs. As $v_k$ grows, so does the absorption $c_{\eff,k}$.
 
+The pair structure of the view enters only through $p_k^\top I_n p_k$.
+For an arbitrary view vector $p_k$,
+\[
+  v_k^{\LW} \;=\; (1-\alpha)\,v_k^\Std \;+\; \alpha\,\mu_s\,\lVert p_k\rVert^2,
+\]
+and every formula below holds verbatim with $2\mu_s$ replaced by
+$\mu_s\lVert p_k\rVert^2$: the general sign criterion is
+$v_k^\Std \lessgtr \mu_s\lVert p_k\rVert^2$. Two specialisations are
+worth recording. An \emph{absolute} view on asset $i$ ($p_k = e_i$,
+$\lVert p_k\rVert^2 = 1$) inflates exactly when $\sigma_i^2 < \mu_s$:
+on our universe a frozen-$\omega$ absolute view on AGG shifts by
+$+12.9$ percentage points---the largest leakage in the universe, ahead
+of every pair---while an absolute view on EEM
+($\sigma_{\mathrm{EEM}}^2 > \mu_s$) shifts by $-0.5$ percentage
+points, the deflation regime realised in the data. A basket view
+(equal-weighted US growth over US value, $\lVert p_k\rVert^2 = 1$)
+shifts by $+5.8$ percentage points.
+
 \subsection{Closed Form for $\Delta c_{\eff,k}$}
 \label{sec:dceff}
 
@@ -463,12 +489,44 @@ form
   \frac{c\,(1-c)\,\bigl(v_k^\LW - v_k^\Std\bigr)}
        {c\,v_k^\LW + (1-c)\,v_k^\Std}.
 \end{equation}
-Two consequences are worth recording. First, the leakage does not depend
-on the prior scale $\tau$ at all; no choice of $\tau$ mitigates it.
-Second, \eqref{eq:dceff-exact} is exact for any pair of positive view
-variances, so it can be evaluated asset pair by asset pair without any
-symmetry assumption. As $v_k^\Std \to 0$ at fixed $\mu_s$ the shift
-approaches its supremum $1-c$.
+Three consequences are worth recording. First, the leakage does not
+depend on the prior scale $\tau$ at all; no choice of $\tau$ mitigates
+it. Second, \eqref{eq:dceff-exact} is exact for any pair of positive
+view variances, so it can be evaluated asset pair by asset pair without
+any symmetry assumption. Third, at fixed variances the shift is
+maximised over the confidence at
+$c^* = 1/\bigl(1+\sqrt{v_k^{\LW}/v_k^\Std}\,\bigr)$; on the IWF/IWD
+pair $c^* = 0.45$ with a shift of $+10.9$ percentage points, so the
+agnostic $c = 0.50$ used throughout operates close to the worst case.
+As $v_k^\Std \to 0$ at fixed $\mu_s$ the shift approaches its supremum
+$1-c$.
+
+\begin{remark}[range and boundary]\label{rem:range}
+As a function of $v_k^\Std \in (0,\infty)$ at fixed target
+$\mu_s\lVert p_k\rVert^2$, the shift \eqref{eq:dceff-exact} is strictly
+decreasing (the numerator of its derivative is
+$-c(1-c)\,\alpha\mu_s\lVert p_k\rVert^2$), with range
+\[
+  \Delta c_{\eff,k} \;\in\;
+  \Bigl(-\,\frac{c\,(1-c)\,\alpha}{1-c\alpha},\; 1-c\Bigr).
+\]
+The leakage is therefore asymmetric: the inflation end is bounded only
+by $1-c$ (fifty percentage points at $c = 0.50$), while the deflation
+end has an $O(\alpha)$ floor---at $\alpha = 0.041$ and $c = 0.50$ no
+view in any universe can lose more than $1.1$ percentage points of
+effective confidence, and even at $\rho_{ij} = -1$ in the symmetric
+setting of Section~\ref{sec:rho-star} the shift is $-0.4$
+($\alpha = 0.041$) to $-3.4$ percentage points ($\alpha = 0.30$). Both
+endpoints are boundary limits: $v_k^\Std \to 0$ corresponds to
+$\rho_{ij} \to 1$ for the equal-volatility pair view, and
+$\rho_{ij} = \pm 1$ itself lies on the boundary of the
+positive-definite cone, where the posterior machinery degenerates but
+\eqref{eq:dceff-exact}, which needs only $v_k^\Std > 0$, extends
+continuously. Note also that shrinkage enforces
+$v_k^{\LW} \geq \alpha\mu_s\lVert p_k\rVert^2 > 0$: Ledoit--Wolf
+regularises exactly the near-degenerate view directions in which the
+frozen-$\omega$ confidence explodes.
+\end{remark}
 
 \subsection{Critical Correlation $\rho^*$ in the Symmetric Case}
 \label{sec:rho-star}
@@ -495,7 +553,8 @@ threshold $\rho^{**}$, which exists once
 $\varepsilon < c(1-c)\alpha/(1-c\alpha)$; at $\alpha = 0.30$ and
 $\varepsilon = 1\,\%$ it sits at $\rho^{**} = -0.32$, at
 $\alpha = 0.041$ it lies far outside $[-1,1]$. The tables below concern
-the positive branch.) The symmetric case is a structural
+the positive branch; Remark~\ref{rem:range} bounds the entire negative
+branch.) The symmetric case is a structural
 sketch rather than the general statement: for $\sigma_i \neq \sigma_j$
 the exact criterion remains \eqref{eq:dceff-exact} evaluated at the
 heterogeneous $v_k^\Std = \sigma_i^2 + \sigma_j^2 -
@@ -1042,8 +1101,11 @@ projection shifts that are exactly linear in $\alpha$. If
 $\omega_k$ is instead computed once and frozen, the estimator switch
 shifts the effective confidence by the exact, $\tau$-free expression
 \eqref{eq:dceff-exact}. The sign criterion is
-$v_k^\Std \lessgtr 2\mu_s$, the symmetric special case yields the
-closed-form correlation threshold \eqref{eq:rho-star}, and the exact
+$v_k^\Std \lessgtr \mu_s\lVert p_k\rVert^2$ ($2\mu_s$ for relative
+pairs), the shift is confined to the band
+$(-c(1-c)\alpha/(1-c\alpha),\,1-c)$ of Remark~\ref{rem:range}, the
+symmetric special case yields the closed-form correlation threshold
+\eqref{eq:rho-star}, and the exact
 single-view identity \eqref{eq:bl-single-exact} propagates the shift
 into posterior means and weights with leverage $1/(\delta v_k)$. On the
 eight-asset universe at $\alpha = 0.041$, five of 28 pairs cross the
@@ -1056,7 +1118,9 @@ analytically. The lesson is procedural: covariance, confidence and view
 uncertainty have to be kept consistent with each other.
 
 Several limitations point to extensions. The closed-form chain covers a
-single relative view and a diagonal $\Omega$; with several simultaneous
+single view (arbitrary view vectors in the shift formula, relative
+pairs for the per-component weight split) and a diagonal $\Omega$; with
+several simultaneous
 views the shifts interact through the posterior precision
 (Remark~\ref{rem:multiview} bounds the size of these cross-terms on our
 data), and the multi-view analogue (via Sherman--Morrison updates) we

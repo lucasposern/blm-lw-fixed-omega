@@ -1,13 +1,13 @@
 # Code for "Black-Litterman with Ledoit-Wolf Shrinkage: Fixed-Ω Leakage and the Critical Correlation Threshold"
 
-Reproduces every number in `main.tex` (the current paper draft) from the
-frozen offline data in `../data/` -- no network access required.
+Reproduces every number in `fixed_omega.tex` (the current paper draft) from
+the frozen offline data in `../data/` -- no network access required.
 
 **Main entry point:**
 
 ```bash
 pip install -r requirements.txt   # plus: pandas scikit-learn cvxpy
-python paper_numbers.py           # reproduces every number in main.tex
+python paper_numbers.py           # reproduces every number in fixed_omega.tex
 ```
 
 `paper_numbers.py` uses the exact thesis pipeline (excess returns, sample
@@ -22,7 +22,7 @@ the out-of-sample backtest 2019-2024.
 
 | File | Reproduces | Data |
 |------|------------|------|
-| `paper_numbers.py` | **every number in `main.tex`** | `../data/` (offline) |
+| `paper_numbers.py` | **every number in `fixed_omega.tex`** | `../data/` (offline) |
 | `core/` | frozen thesis pipeline (covariance, views, BLM, metrics, QP) | — |
 | `rho_star_table.py` | standalone ρ\*(α, ε) table, corrected formula | offline |
 | `blm_core.py` | legacy helpers (old report) | — |
@@ -31,14 +31,16 @@ the out-of-sample backtest 2019-2024.
 
 ## History / caveats
 
-- **2026-07 extension pass (`main_v2.tex`).** Edge cases closed: general
+- **2026-07 file consolidation.** `main_v2.tex` renamed to
+  `fixed_omega.tex`, now the single canonical paper file; `main.tex`
+  (referee-fix state without the extensions, a strict subset) removed.
+- **2026-07 extension pass (formerly `main_v2.tex`).** Edge cases closed: general
   view vectors (v_LW = (1−α)v + α·μ_s·‖p‖², criterion v ≶ μ_s‖p‖²;
   absolute view AGG +12.9pp = largest leakage, EEM −0.5pp = realised
   deflation, basket +5.8pp), strict monotonicity in v with range
   (−c(1−c)α/(1−cα), 1−c) incl. deflation floor (answers ρ=−1),
   PD-boundary notes (ρ=±1 as continuous limits), worst-case confidence
   c* = 1/(1+√(v_LW/v)). Numbers in section [7] of `paper_numbers.py`.
-  `main.tex` = referee-fix state without extensions.
 - **2026-07 revision 2 (referee fixes).** Two conventions pinned for
   exactness: (i) Σ_LW = (1−α)Σ_s + α·μ_s·I with sklearn's analytic α
   applied to the ddof=1 sample matrix (sklearn's own covariance output
@@ -49,7 +51,8 @@ the out-of-sample backtest 2019-2024.
   multi-view absorption diagnostics (paper Remark 1) and a Memmel (2003)
   Sharpe-difference test. Numbers changed at the 0.1–0.5pp level
   (e.g. IWF/IWD pair shift +10.6 → +10.7pp; backtest 17.78 → 18.06%).
-- **2026-07 revision.** `main.tex` replaces `tau_omega_independence_BLM.tex`
+- **2026-07 revision.** `main.tex` (since renamed, see consolidation
+  above) replaced `tau_omega_independence_BLM.tex`
   (old draft, kept for reference). The old draft and the pre-revision
   `rho_star_table.py` contained an incorrect ρ* formula (factor-2 error:
   every table row shifted by one ε level). Corrected and verified against
