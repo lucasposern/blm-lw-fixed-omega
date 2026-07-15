@@ -6,7 +6,7 @@ the frozen offline data in `../data/` -- no network access required.
 **Main entry point:**
 
 ```bash
-pip install -r requirements.txt   # plus: pandas scikit-learn cvxpy
+pip install -r requirements.txt
 python paper_numbers.py           # reproduces every number in fixed_omega.tex
 ```
 
