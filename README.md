@@ -11,8 +11,9 @@ view confidence shifts by an exact, τ-free closed form; the sign criterion is
 `v < 2·μ_s` (view variance vs. twice the average asset variance), which catches
 highly correlated style pairs *and* low-variance bond pairs. On the eight-asset
 Idzorek universe (α = 0.041), five of 28 pairs shift by more than 5 pp, IWF/IWD
-by +10.7 pp. Out of sample, the frozen-Ω workflow forfeits close to half of the
-de-risking the estimator switch was meant to deliver.
+by +10.7 pp. In the weights, the frozen-Ω workflow restores roughly 40 % of the
+gross-exposure reduction that the estimator switch delivers (gross exposure
+3.63 instead of 3.16).
 
 ## Repository layout
 
